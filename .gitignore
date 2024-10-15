@@ -1,0 +1,9 @@
+# Ignore macOS .DS_Store files
+.DS_Store
+
+# Ignore virtual environments
+server/rosetta-env/
+experiments/tobii-env-rosetta/
+
+# Ignore __pycache__ directories
+server/__pycache__/
