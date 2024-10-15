@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "EyeNav",
+  "version": "1.0",
+  "permissions": ["activeTab", "storage", "tabs", "scripting"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "EyeNav",
+    "default_popup": "./popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["jquery.min.js", "content.js"]
+    }
+  ],
+  "icons": {
+    "16": "./resources/logo/pg-logo16.png",
+    "48": "./resources/logo/pg-logo48.png",
+    "128": "./resources/logo/pg-logo128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["ball_cursor.png", "./resources/logo/pg-logo16.png", "./resources/logo/pg-logo48.png", "./resources/logo/pg-logo128.png"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

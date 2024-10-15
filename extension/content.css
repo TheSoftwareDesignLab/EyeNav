@@ -1,0 +1,13 @@
+.hover-highlight {
+    outline: 2px solid red;
+}
+
+#hoverTooltip {
+    background-color: white;
+    border: 1px solid black;
+    padding: 5px;
+    position: absolute;
+    z-index: 9999;
+    max-width: 300px;
+    display: none;
+}

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Eye Tracking Session</title>
+    <link rel="stylesheet" type="text/css" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <img src="pg-logo.svg" alt="Eye Tracking Logo" class="logo">
+        <h1>EyeNav</h1>
+        <p>Start or stop a session</p>
+        <div id="start-button" class="button">Start</div>
+        <div id="stop-button" class="button">Stop</div>
+        <hr style="width:50%">
+        
+        <div class="checkbox-container">
+            <input type="checkbox" id="toggle-hover" />
+            <label for="toggle-hover">Show Hover Elements</label>
+        </div>
+
+        <div class="checkbox-container">
+            <input type="checkbox" id="toggle-highlight" />
+            <label for="toggle-highlight">Show Highlight</label>
+        </div>
+
+        <p id="message" class="message"></p>
+
+        <div class="visualization-container" id="visualization-container"></div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+body,
+h1,
+p {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Trebuchet MS', sans-serif;
+    background-color: #f7f7f7;
+    color: #000000;
+    padding: 20px;
+    width: 400px;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.logo {
+    width: 100px;
+    height: auto;
+    margin-bottom: 15px;
+}
+
+h1 {
+    margin-bottom: 10px;
+    font-size: xx-large;
+}
+
+
+p {
+    margin-bottom: 20px;
+    color: #666;
+    text-align: center;
+    font-size: 18px;
+}
+
+.button {
+    background-color: #999a99;
+    color: white;
+    padding: 15px 30px;
+    margin: 10px;
+    border: none;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 18px;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+
+.button:hover {
+    background-color: #0b7a53;
+    transform: scale(1.1);
+}
+
+
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+
+input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin-right: 10px;
+}
+
+
+label {
+    font-size: 18px;
+    line-height: 20px;
+    margin-bottom: 0;
+}
+
+.message {
+    color: #8c0909;
+}
+
+
