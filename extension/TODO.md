@@ -1,5 +1,0 @@
-- [X] Add other gestures (zoom, scroll)
-- [X] When person says "write" the system should listen for voice input and write it down
-- [] future work section in final document
-- [] fix highlight and hover tools
-- [X] fix onclick listener for the buttons
