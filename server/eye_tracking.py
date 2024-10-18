@@ -8,8 +8,8 @@ global_gaze_data = None
 previous_position = None
 is_tracking = False
 my_eyetracker = None
-gaze_buffer = deque(maxlen=5)  # To introduce input lag with a buffer of previous gaze points
-threshold_distance = 20  # Minimum movement threshold to create "stationary" behavior
+gaze_buffer = deque(maxlen=5)  
+threshold_distance = 30
 
 def gaze_data_callback(gaze_data):
     global global_gaze_data
@@ -52,21 +52,16 @@ def track_gaze():
             if not math.isnan(gaze_point[0]) and not math.isnan(gaze_point[1]):
                 screen_x = screen_w * gaze_point[0]
                 screen_y = screen_h * gaze_point[1]
-
-                # Add the current gaze point to the buffer to simulate input lag
                 gaze_buffer.append((screen_x, screen_y))
 
                 if len(gaze_buffer) == gaze_buffer.maxlen:
-                    # Get the average of the gaze points to smooth the movement
                     avg_x = sum([g[0] for g in gaze_buffer]) / gaze_buffer.maxlen
                     avg_y = sum([g[1] for g in gaze_buffer]) / gaze_buffer.maxlen
 
                     if previous_position is None:
                         previous_position = (avg_x, avg_y)
 
-                    # Calculate the distance between current and previous position
                     if distance(previous_position, (avg_x, avg_y)) > threshold_distance:
-                        # Move only if the change is significant (outside the stationary threshold)
                         previous_position = smooth_move_to(avg_x, avg_y, previous_position[0], previous_position[1])
 
         time.sleep(0.01)

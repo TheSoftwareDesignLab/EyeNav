@@ -7,3 +7,5 @@ experiments/tobii-env-rosetta/
 
 # Ignore __pycache__ directories
 server/__pycache__/
+
+TODO.md

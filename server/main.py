@@ -5,8 +5,7 @@ import eye_tracking
 import voice_control
 import time
 import os
-
-TEST_DIRECTORY = "test_sessions"
+import settings 
 
 app = Flask(__name__)
 CORS(app)
@@ -14,7 +13,6 @@ CORS(app)
 tracking_thread = None
 voice_thread = None
 is_tracking = False
-test_file = None
 start_time = None
 
 @app.route('/status', methods=['GET'])
@@ -23,7 +21,7 @@ def status():
 
 @app.route('/start', methods=['POST'])
 def start_tracking():
-    global tracking_thread, voice_thread, is_tracking, test_file, start_time
+    global tracking_thread, voice_thread, is_tracking, start_time
 
     data = request.get_json()
     page_name = data.get('pageName')
@@ -32,9 +30,11 @@ def start_tracking():
     if tracking_thread is None or not tracking_thread.is_alive():
         is_tracking = True
         start_time = time.strftime('%Y-%m-%d_%H-%M-%S')  
-        test_file = os.path.join(TEST_DIRECTORY, f"test_session_{start_time}.feature")
         
-        with open(test_file, "w") as f:
+        # Set the test file in settings.py
+        settings.test_file = os.path.join(settings.TEST_DIRECTORY, f"test_session_{start_time}.feature")
+        
+        with open(settings.test_file, "w") as f:
             f.write(f"Feature: Session on {time.strftime('%b %d at %I:%M:%S %p')}\n\n")
             f.write("@user1 @web\n")
             f.write(f'Scenario: User interacts with the web page named "{page_name}"\n\n')
@@ -52,7 +52,7 @@ def start_tracking():
 
 @app.route('/stop', methods=['GET'])
 def stop_tracking():
-    global is_tracking, test_file
+    global is_tracking
 
     if is_tracking:
         is_tracking = False
@@ -65,7 +65,6 @@ def stop_tracking():
 
 @app.route('/tag-info', methods=['POST'])
 def tag_info():
-    global test_file
     data = request.get_json()
     tag_name = data.get('tagName')
     href = data.get('href')
@@ -80,8 +79,8 @@ def tag_info():
     else:
         test_script = f'\tThen I click on tag "{tag_name}" with xpath "{xpath}"'
 
-    if test_file:
-        with open(test_file, "a") as f:
+    if settings.test_file:  
+        with open(settings.test_file, "a") as f:
             f.write(f"{test_script}\n")
         return jsonify({"status": "success"}), 200
     else:
