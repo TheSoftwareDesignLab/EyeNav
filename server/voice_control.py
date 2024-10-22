@@ -5,6 +5,7 @@ import sounddevice as sd
 import json
 import time  # For timestamping the transcription
 from vosk import Model, KaldiRecognizer
+from websocket_server import message_queue
 
 # Data structures
 
@@ -28,7 +29,7 @@ number_words = {
     "nine": 9,
     "ten": 10
 }
-control_words = ["input", "stop", "enter"]
+control_words = ["input", "stop", "enter", "click", "back", "forward"]
 
 # Directory for transcriptions
 TRANSCRIPTION_DIR = "transcriptions"
@@ -36,6 +37,7 @@ TRANSCRIPTION_DIR = "transcriptions"
 # Ensure transcription directory exists
 if not os.path.exists(TRANSCRIPTION_DIR):
     os.makedirs(TRANSCRIPTION_DIR)
+
 
 # Create a transcription file with the current date and time
 timestamp = time.strftime('%Y-%m-%d_%H-%M-%S')
@@ -85,6 +87,8 @@ def execute_command(command):
 
     # Log the recognized command
     log_transcription(command)
+    # send command to socket
+    message_queue.put(command)
 
     if is_typing_mode:
         print(f"Typing: {command}")
@@ -93,6 +97,14 @@ def execute_command(command):
             print("Stopping typing mode...")
             is_typing_mode = False
             pyautogui.press("enter") 
+            return
+        elif command in control_words:
+            print("Control word detected")
+            is_typing_mode = False
+            
+            if command == "click":
+                pyautogui.click()
+                print("Mouse click performed")
             return
 
         # Filter out any control words like "input", "stop", "enter" from being typed

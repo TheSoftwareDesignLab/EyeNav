@@ -5,6 +5,10 @@ chrome.action.onClicked.addListener((tab) => {
     });
 });
 
+chrome.sidePanel
+  .setPanelBehavior({ openPanelOnActionClick: true })
+  .catch((error) => console.error(error));
+
 function toggleTooltip() {
     if (window.hasTooltipScript) {
         const tooltip = document.getElementById('hoverTooltip');

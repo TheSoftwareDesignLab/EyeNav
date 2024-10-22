@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>Eye Tracking Session</title>
-    <link rel="stylesheet" type="text/css" href="popup.css">
+    <link rel="stylesheet" type="text/css" href="sidepanel.css">
 </head>
 <body>
     <div class="container">
@@ -25,8 +25,11 @@
 
         <p id="message" class="message"></p>
 
-        <div class="visualization-container" id="visualization-container"></div>
+        <div class="visualization-container" id="visualization-container">
+            <p id="nlp-command">Waiting for NLP commands...</p>
+        </div>
+        
     </div>
-    <script src="popup.js"></script>
+    <script src="sidepanel.js"></script>
 </body>
 </html>

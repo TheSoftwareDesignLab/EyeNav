@@ -5,7 +5,8 @@ import eye_tracking
 import voice_control
 import time
 import os
-import settings 
+import settings
+from websocket_server import start_websocket_server, message_queue
 
 app = Flask(__name__)
 CORS(app)
@@ -14,6 +15,9 @@ tracking_thread = None
 voice_thread = None
 is_tracking = False
 start_time = None
+
+# List to hold connected WebSocket clients
+connected_clients = []
 
 @app.route('/status', methods=['GET'])
 def status():
@@ -31,7 +35,6 @@ def start_tracking():
         is_tracking = True
         start_time = time.strftime('%Y-%m-%d_%H-%M-%S')  
         
-        # Set the test file in settings.py
         settings.test_file = os.path.join(settings.TEST_DIRECTORY, f"test_session_{start_time}.feature")
         
         with open(settings.test_file, "w") as f:
@@ -85,6 +88,11 @@ def tag_info():
         return jsonify({"status": "success"}), 200
     else:
         return jsonify({"status": "error", "message": "Test file not initialized"}), 500
+    
+
 
 if __name__ == '__main__':
+    start_websocket_server()
+
+    # Run the Flask HTTP server
     app.run(host='0.0.0.0', port=5001)

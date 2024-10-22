@@ -3,10 +3,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const messageElement = document.getElementById('message');
     const hoverCheckbox = document.getElementById('toggle-hover');
     const highlightCheckbox = document.getElementById('toggle-highlight');
+    const nlpCommandElement = document.getElementById('nlp-command'); // Area for NLP command display
 
     // Initialize hover setting and server status
     checkServerStatus();
     loadHoverSetting();
+    setupWebSocket();
 
     // Event Listeners
     hoverCheckbox.addEventListener('change', onToggleChange('hover'));
@@ -31,26 +33,24 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     /**
-     * Event handler for hover checkbox toggle
-     * @param {string} toggleType - The type of toggle, can be either 'hover' or 'highlight'
+     * Event handler for hover and highlight checkbox toggles
+     * @param {string} toggleType - The type of toggle ('hover' or 'highlight')
      */
     function onToggleChange(toggleType) {
         return function(event) {
             const isChecked = event.target.checked;
-            
+
             // Save the state to Chrome storage
             chrome.storage.sync.set({ [toggleType]: isChecked }, function() {
                 console.log(`${toggleType} ${isChecked ? 'enabled' : 'disabled'} state is set`);
             });
-    
+
             // Notify the content script about toggle state change
             chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
                 chrome.tabs.sendMessage(tabs[0].id, { action: 'toggle' + toggleType.charAt(0).toUpperCase() + toggleType.slice(1), enabled: isChecked });
             });
         };
     }
-
-
 
     // Control functions
 
@@ -61,8 +61,8 @@ document.addEventListener('DOMContentLoaded', function() {
         chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
             const activeTab = tabs[0];
             const pageDetails = {
-                pageName: activeTab.title, 
-                pageUrl: activeTab.url 
+                pageName: activeTab.title,
+                pageUrl: activeTab.url
             };
 
             console.log('Starting session with page details:', pageDetails);
@@ -78,8 +78,6 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 messageElement.textContent = 'Eye-tracking session started.';
-
-                window.close(); 
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -118,5 +116,51 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error:', error);
                 messageElement.textContent = 'Cannot reach the server. Please ensure the Python server is running.';
             });
+    }
+
+    /**
+     * Setup WebSocket connection to receive real-time NLP commands
+     */
+    function setupWebSocket() {
+        const socket = new WebSocket('ws://localhost:5002/');  // Connect to WebSocket server on port 5002
+        console.log('WebSocket connection created');
+
+        socket.onopen = function(event) {
+            console.log('WebSocket connection established');
+        };
+
+        socket.onmessage = function(event) {
+            const message = event.data;
+            console.log('WebSocket message received:', message);
+        
+            if (message === 'ping') {
+                socket.send('pong');  // Respond with pong to keep the connection alive
+            } else {
+                displayNLPCommand(message);  // Display the received message
+            }
+        };
+        
+
+        socket.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
+
+        socket.onclose = function(event) {
+            console.log('WebSocket connection closed', event);
+        };
+    }
+    
+
+    /**
+     * Display NLP command in the side panel UI
+     * @param {string} command - The NLP command to display
+     */
+    function displayNLPCommand(command) {
+        const commandElement = document.createElement('p');
+        console.log('NLP Command:', command);
+        commandElement.textContent = 'Recognized: ' + command;
+        nlpCommandElement.innerHTML = '';
+        nlpCommandElement.appendChild(commandElement);
+        
     }
 });

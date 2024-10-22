@@ -254,6 +254,8 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
  * Main initialization function
  */
 function initialize() {
+    console.log('EyeNav content script initialized');
+    
     createTooltip();
     createHighlightStyle();
 
@@ -270,3 +272,4 @@ function initialize() {
 
 // Call the main initialization function
 initialize();
+
