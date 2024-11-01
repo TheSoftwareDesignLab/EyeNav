@@ -16,11 +16,11 @@ def gaze_data_callback(gaze_data):
     global_gaze_data = gaze_data
 
 def subscribe_to_gaze_data(eyetracker):
-    print("Subscribing to gaze data for eye tracker with serial number {0}.".format(eyetracker.serial_number))
+    print("INFO: Subscribing to gaze data for eye tracker with serial number {0}.".format(eyetracker.serial_number))
     eyetracker.subscribe_to(tr.EYETRACKER_GAZE_DATA, gaze_data_callback, as_dictionary=True)
 
 def unsubscribe_from_gaze_data(eyetracker):
-    print("Unsubscribing from gaze data for eye tracker with serial number {0}.".format(eyetracker.serial_number))
+    print("INFO: Unsubscribing from gaze data for eye tracker with serial number {0}.".format(eyetracker.serial_number))
     eyetracker.unsubscribe_from(tr.EYETRACKER_GAZE_DATA, gaze_data_callback)
 
 def smooth_move_to(x, y, previous_x, previous_y, smoothing=0.5):
@@ -38,7 +38,7 @@ def track_gaze():
 
     found_eyetrackers = tr.find_all_eyetrackers()
     if len(found_eyetrackers) == 0:
-        print("No eye trackers found.")
+        print("INFO: No eye trackers found.")
         return
 
     my_eyetracker = found_eyetrackers[0]

@@ -4,8 +4,10 @@ server/test_sessions/
 server/transcriptions/
 
 server/rosetta-env/
-experiments/tobii-env-rosetta/
+experiments/
 
 server/__pycache__/
+
+KrakenMobile-1.0.9
 
 TODO.md

@@ -3,6 +3,7 @@ from flask_cors import CORS
 import threading
 import eye_tracking
 import voice_control
+import interaction_logger
 import time
 import os
 import settings
@@ -11,21 +12,27 @@ from websocket_server import start_websocket_server, message_queue
 app = Flask(__name__)
 CORS(app)
 
+# Threads and global variables
 tracking_thread = None
 voice_thread = None
+logging_thread = None
+
 is_tracking = False
 start_time = None
 
-# List to hold connected WebSocket clients
-connected_clients = []
 
 @app.route('/status', methods=['GET'])
 def status():
     return jsonify({"status": "Server is running"}), 200
 
+
 @app.route('/start', methods=['POST'])
 def start_tracking():
     global tracking_thread, voice_thread, is_tracking, start_time
+    start_time = time.strftime('%Y-%m-%d_%H-%M-%S')  
+        
+    settings.test_file = os.path.join(settings.TEST_DIRECTORY, f"test_session_{start_time}.feature")
+    settings.transcription_file = os.path.join(settings.TRANSCRIPTION_DIR, f"transcription_{start_time}.log")
 
     data = request.get_json()
     page_name = data.get('pageName')
@@ -33,9 +40,6 @@ def start_tracking():
 
     if tracking_thread is None or not tracking_thread.is_alive():
         is_tracking = True
-        start_time = time.strftime('%Y-%m-%d_%H-%M-%S')  
-        
-        settings.test_file = os.path.join(settings.TEST_DIRECTORY, f"test_session_{start_time}.feature")
         
         with open(settings.test_file, "w") as f:
             f.write(f"Feature: Session on {time.strftime('%b %d at %I:%M:%S %p')}\n\n")
@@ -48,10 +52,15 @@ def start_tracking():
 
         voice_thread = threading.Thread(target=voice_control.main)
         voice_thread.start()
+        
+        
+        logging_thread = threading.Thread(target=interaction_logger.main, daemon=True)
+        logging_thread.start()
 
         return jsonify({"status": "Eye tracking and voice control started"}), 200
     else:
         return jsonify({"status": "Eye tracking is already running"}), 400
+
 
 @app.route('/stop', methods=['GET'])
 def stop_tracking():
@@ -66,6 +75,7 @@ def stop_tracking():
     else:
         return jsonify({"status": "Eye tracking is not running"}), 400
 
+
 @app.route('/tag-info', methods=['POST'])
 def tag_info():
     data = request.get_json()
@@ -75,24 +85,10 @@ def tag_info():
     class_name = data.get('className')
     xpath = data.get('xpath')
 
-    if href:
-        test_script = f'\tThen I click on tag "{tag_name}" with href "{href}"'
-    elif element_id:
-        test_script = f'\tThen I click on tag "{tag_name}" with id "{element_id}"'
-    else:
-        test_script = f'\tThen I click on tag "{tag_name}" with xpath "{xpath}"'
-
-    if settings.test_file:  
-        with open(settings.test_file, "a") as f:
-            f.write(f"{test_script}\n")
-        return jsonify({"status": "success"}), 200
-    else:
-        return jsonify({"status": "error", "message": "Test file not initialized"}), 500
-    
+    interaction_logger.interaction_queue.put((time.time(), {type: "click", href: href, id: element_id, xpath: xpath}))
 
 
 if __name__ == '__main__':
     start_websocket_server()
 
-    # Run the Flask HTTP server
-    app.run(host='0.0.0.0', port=5001)
+    app.run(host='0.0.0.0', port=5001) # flask app

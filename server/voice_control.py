@@ -1,11 +1,13 @@
 import pyautogui
+import settings
 import os
 import queue
 import sounddevice as sd
 import json
-import time  # For timestamping the transcription
+import time  
 from vosk import Model, KaldiRecognizer
 from websocket_server import message_queue
+import interaction_logger
 
 # Data structures
 
@@ -29,19 +31,14 @@ number_words = {
     "nine": 9,
     "ten": 10
 }
-control_words = ["input", "stop", "enter", "click", "back", "forward"]
+control_words = ["input", "stop", "enter", "click", "back", "forward", "go"]
 
-# Directory for transcriptions
-TRANSCRIPTION_DIR = "transcriptions"
+if settings.transcription_file is not None:
+    transcription_file = settings.transcription_file
+else:
+    start_time = time.strftime('%Y-%m-%d_%H-%M-%S')  
+    transcription_file = os.path.join(settings.TRANSCRIPTION_DIR, f"outside_session_transcription_{start_time}.log")
 
-# Ensure transcription directory exists
-if not os.path.exists(TRANSCRIPTION_DIR):
-    os.makedirs(TRANSCRIPTION_DIR)
-
-
-# Create a transcription file with the current date and time
-timestamp = time.strftime('%Y-%m-%d_%H-%M-%S')
-transcription_file = os.path.join(TRANSCRIPTION_DIR, f"transcription_{timestamp}.log")
 
 def log_transcription(text):
     """
@@ -50,6 +47,18 @@ def log_transcription(text):
     """
     with open(transcription_file, "a") as f:
         f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {text}\n")
+
+def log_interaction(interaction, *args, **kwargs):
+    """
+    Logs an interaction to the test file.
+    @param interaction: The string representing the interaction (input, back or forward)
+    """
+    dictionary = {"type": interaction}
+    # input interaction has text, back and forward have None, i need to take the text from the args
+    if interaction == "input":
+        dictionary["text"] = args[0]
+    interaction_logger.interaction_queue.put((time.time(), dictionary))
+
 
 def extract_number_from_words(words):
     """
@@ -61,6 +70,7 @@ def extract_number_from_words(words):
         if word in number_words:
             return number_words[word]
     return None
+
 
 def extract_direction_from_words(words):
     """
@@ -74,6 +84,7 @@ def extract_direction_from_words(words):
         return 1  # Scroll up is positive
     return None
 
+
 def execute_command(command):
     """
     Executes a command based on the given text
@@ -82,7 +93,6 @@ def execute_command(command):
     global is_typing_mode
     
     command = command.lower()
-    
     words = command.split()
 
     # Log the recognized command
@@ -97,7 +107,9 @@ def execute_command(command):
             print("Stopping typing mode...")
             is_typing_mode = False
             pyautogui.press("enter") 
+            log_interaction("input", command)
             return
+        
         elif command in control_words:
             print("Control word detected")
             is_typing_mode = False
@@ -107,7 +119,6 @@ def execute_command(command):
                 print("Mouse click performed")
             return
 
-        # Filter out any control words like "input", "stop", "enter" from being typed
         filtered_words = [word for word in words if word not in control_words]
         if filtered_words:
             pyautogui.write(' '.join(filtered_words)) 
@@ -132,7 +143,8 @@ def execute_command(command):
                 print("No valid number of units found")
                 return
             
-            pyautogui.scroll(scroll_units * 100 * direction)
+            pyautogui.scroll(scroll_units * 10 * direction)
+            # log_interaction(f"go {direction}", direction, scroll_units)
             direction_text = "down" if direction == -1 else "up"
             print(f"Scrolling {scroll_units} units {direction_text}")
         except (ValueError, IndexError):
@@ -141,15 +153,18 @@ def execute_command(command):
 
     if "back" in words:
         pyautogui.hotkey('command', '[')
+        log_interaction("back")
         print("Going back")
     elif "forward" in words:
         pyautogui.hotkey('command', ']')
+        log_interaction("forward")
         print("Going forward")
     
 
     if "click" in words:
         pyautogui.click()
         print("Mouse click performed")
+
 
 def recognize_voice():
     """
@@ -163,8 +178,9 @@ def recognize_voice():
             result_json = json.loads(result)
             command = result_json.get("text", "")
             if command:
-                print(f"Recognized: {command}")
+                print(f"VOICE COMMAND HEARD: {command}")
                 execute_command(command)
+
 
 def stop_voice_control():
     """
@@ -172,6 +188,7 @@ def stop_voice_control():
     """
     global is_voice_recognition_active
     is_voice_recognition_active = False
+
 
 def audio_callback(indata, frames, time, status):
     """
@@ -182,6 +199,7 @@ def audio_callback(indata, frames, time, status):
     @param status: status
     """
     audio_queue.put(bytes(indata))
+
 
 def main():
     """

@@ -1,84 +1,168 @@
-body,
-h1,
-p {
+* {
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
+    font-family: 'Inter', sans-serif; 
+}
+
+
+.inter-fooont {
+  font-family: "Inter", serif;
+  font-optical-sizing: auto;
+  font-weight: auto;
+  font-style: normal;
 }
 
 body {
-    font-family: 'Trebuchet MS', sans-serif;
-    background-color: #f7f7f7;
-    color: #000000;
-    padding: 20px;
-    width: 400px;
+    justify-content: center;
+    align-items: center;
+    background-color: #f5f5f5;
 }
 
 .container {
+    width: 100%;
+    max-width: 500px;
+    background-color: #fff;
+    padding: 20px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.header {
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
     align-items: center;
 }
 
-.logo {
-    width: 100px;
-    height: auto;
-    margin-bottom: 15px;
+.logo img{
+    width: 34px;
+    height: 34px;
+}
+
+.info-icon img {
+    width: 34px;
+    height: 34px;
+    padding: 5px;
 }
 
 h1 {
-    margin-bottom: 10px;
-    font-size: xx-large;
+    font-size: 22px;
+    color: #333;
 }
 
-
-p {
-    margin-bottom: 20px;
-    color: #666;
+.start-session {
     text-align: center;
-    font-size: 18px;
+    margin: 20px 0;
+
 }
 
-.button {
-    background-color: #999a99;
+.play-button {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: gray;
     color: white;
-    padding: 15px 30px;
-    margin: 10px;
     border: none;
-    border-radius: 8px;
-    text-align: center;
-    font-size: 18px;
-    transition: background-color 0.3s ease, transform 0.2s ease;
-}
-
-
-.button:hover {
-    background-color: #0b7a53;
-    transform: scale(1.1);
-}
-
-
-.checkbox-container {
-    display: flex;
+    justify-content: center;
     align-items: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    display: flex;
+    
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.play-button:active {
+    transform: scale(0.95);
+}
+
+.visualization-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+    width: 100%;
+    max-width: 500px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+
+
+.highlight {
+    color: blue;
+    font-weight: bold;
+}
+
+.start-session p {
+    margin-top: 10px;
+    color: #666;
+}
+
+
+
+h2 {
+    font-size: 12px;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.voice-commands p {
+    font-size: 14px;
+    color: #666;
     margin-bottom: 20px;
 }
 
+.command {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
 
-input[type="checkbox"] {
+.command img {
     width: 20px;
     height: 20px;
     margin-right: 10px;
 }
 
-
-label {
-    font-size: 18px;
-    line-height: 20px;
-    margin-bottom: 0;
+.command h3 {
+    font-size: 12px;
+    color: #333;
+    margin-bottom: 5px;
 }
 
-.message {
-    color: #8c0909;
+.command p {
+    font-size: 12px;
+    color: #666;
 }
 
+.voice-commands table {
+    width: 100%;
+    border-spacing: 0 15px;
+}
 
+.voice-commands td {
+    padding: 5px;
+    vertical-align: middle;
+}
+
+.voice-commands img {
+    width: 30px;
+    height: auto;
+}
+
+.voice-commands h2 {
+    font-size: 14px;
+    margin-bottom: 5px;
+    margin-top: 0;
+    color: #333;
+}
+
+.voice-commands p {
+    font-size: 12px;
+    color: #666;
+    margin: 0;
+}

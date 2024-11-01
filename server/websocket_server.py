@@ -4,12 +4,12 @@ import time
 import queue
 
 connected_clients = []
-message_queue = queue.Queue()  # Thread-safe queue for handling messages
+message_queue = queue.Queue() 
 
 class WebSocketApp(WebSocketApplication):
     def on_open(self):
         connected_clients.append(self.ws)
-        print("New WebSocket connection established")
+        print("INFO: New WebSocket connection established")
     
     def on_message(self, message):
         if message:
@@ -24,18 +24,20 @@ class WebSocketApp(WebSocketApplication):
         while not self.ws.closed:
             try:
                 self.ws.send('ping')
-                time.sleep(30)  # Ping every 30 seconds
+                time.sleep(30)  
             except Exception as e:
                 print(f"Error sending ping: {e}")
                 break
 
-# Function to start the WebSocket server in a separate thread
+
 def websocket_server():
+    port = 5002
     resource = Resource([('/', WebSocketApp)])
-    ws_server = WebSocketServer(('0.0.0.0', 5002), resource)
+    ws_server = WebSocketServer(('0.0.0.0', port), resource)
+    print(f"INFO: Starting WebSocket server on ws:// on port {port}")
     ws_server.serve_forever()
 
-# Function to send messages from the queue to WebSocket clients
+
 def send_message_from_queue():
     while True:
         try:
@@ -43,12 +45,12 @@ def send_message_from_queue():
             for ws in connected_clients:
                 if not ws.closed:
                     ws.send(command)
-                    print(f"Sent: {command}")
+
         except Exception as e:
             print(f"Error sending message: {e}")
         time.sleep(1)
 
-# Start both WebSocket server and message handling threads
+
 def start_websocket_server():
     websocket_thread = threading.Thread(target=websocket_server)
     websocket_thread.start()
