@@ -33,11 +33,9 @@ number_words = {
 }
 control_words = ["input", "stop", "enter", "click", "back", "forward", "go"]
 
-if settings.transcription_file is not None:
-    transcription_file = settings.transcription_file
-else:
-    start_time = time.strftime('%Y-%m-%d_%H-%M-%S')  
-    transcription_file = os.path.join(settings.TRANSCRIPTION_DIR, f"outside_session_transcription_{start_time}.log")
+
+def get_transcription_file():
+    return settings.transcription_file if settings.transcription_file else transcription_file
 
 
 def log_transcription(text):
@@ -45,8 +43,10 @@ def log_transcription(text):
     Logs the given text to the transcription file
     @param text: text to log
     """
-    with open(transcription_file, "a") as f:
+    filename = get_transcription_file()
+    with open(filename, "a") as f:
         f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {text}\n")
+
 
 def log_interaction(interaction, *args, **kwargs):
     """
@@ -54,10 +54,15 @@ def log_interaction(interaction, *args, **kwargs):
     @param interaction: The string representing the interaction (input, back or forward)
     """
     dictionary = {"type": interaction}
-    # input interaction has text, back and forward have None, i need to take the text from the args
     if interaction == "input":
         dictionary["text"] = args[0]
-    interaction_logger.interaction_queue.put((time.time(), dictionary))
+    
+    if interaction == "go":
+        dictionary["direction"] = args[0]
+        dictionary["units"] = args[1]
+    
+    print(f"DEBUG: Interaction -> {interaction}")
+    interaction_logger.interaction_queue.put(dictionary)
 
 
 def extract_number_from_words(words):
@@ -130,8 +135,19 @@ def execute_command(command):
         is_typing_mode = True
         return
 
-    # eg. "go down two" "go up three"
+    
     if "go" in words:
+        if "back" in words:
+            pyautogui.hotkey('command', '[')
+            log_interaction("back")
+            print("Going back")
+            return
+        elif "forward" in words:
+            pyautogui.hotkey('command', ']')
+            log_interaction("forward")
+            print("Going forward")
+            return
+
         try:
             direction = extract_direction_from_words(words)
             if direction is None:
@@ -144,7 +160,7 @@ def execute_command(command):
                 return
             
             pyautogui.scroll(scroll_units * 10 * direction)
-            # log_interaction(f"go {direction}", direction, scroll_units)
+            log_interaction(f"go {direction}", direction, scroll_units)
             direction_text = "down" if direction == -1 else "up"
             print(f"Scrolling {scroll_units} units {direction_text}")
         except (ValueError, IndexError):
@@ -208,7 +224,6 @@ def main():
     global is_voice_recognition_active
     is_voice_recognition_active = True  
 
-    print(f"Session started. Transcription saved at {transcription_file}")
     with sd.RawInputStream(samplerate=16000, blocksize=8000, dtype='int16',
                            channels=1, callback=audio_callback):
         recognize_voice()

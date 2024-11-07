@@ -1,0 +1,1 @@
+{"version":3,"file":"AndroidProcess.d.ts","sourceRoot":"","sources":["../../src/processes/AndroidProcess.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,aAAa,EAAE,MAAM,iBAAiB,CAAC;AAChD,OAAO,EAAE,MAAM,EAAE,MAAM,mBAAmB,CAAC;AAC3C,OAAO,EAAE,YAAY,EAAE,MAAM,iBAAiB,CAAC;AAG/C,qBAAa,cAAe,SAAQ,aAAa;gBACnC,EAAE,EAAE,MAAM,EAAE,MAAM,EAAE,MAAM,EAAE,YAAY,EAAE,YAAY;IAI5D,GAAG;CAQV"}

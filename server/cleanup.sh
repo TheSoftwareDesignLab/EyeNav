@@ -1,0 +1,1 @@
+rm -rf test_sessions/* transcriptions/* __pycache__

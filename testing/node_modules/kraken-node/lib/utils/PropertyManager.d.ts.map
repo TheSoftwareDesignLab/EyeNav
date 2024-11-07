@@ -1,0 +1,1 @@
+{"version":3,"file":"PropertyManager.d.ts","sourceRoot":"","sources":["../../src/utils/PropertyManager.ts"],"names":[],"mappings":"AAGA,qBAAa,eAAe;IAC1B,OAAO,CAAC,MAAM,CAAC,iBAAiB,CAAkB;;WAIpC,QAAQ,IAAI,eAAe;IAOzC,MAAM,CAAC,iBAAiB,CAAC,MAAM,EAAE,MAAM,GAAG,OAAO;IAIjD,WAAW,CAAC,QAAQ,EAAE,MAAM;IAU5B,OAAO,CAAC,iBAAiB;CAQ1B"}

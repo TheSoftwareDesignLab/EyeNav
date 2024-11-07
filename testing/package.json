@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "kraken-node": "^1.0.24"
+  }
+}

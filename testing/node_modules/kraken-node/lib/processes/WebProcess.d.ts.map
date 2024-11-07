@@ -1,0 +1,1 @@
+{"version":3,"file":"WebProcess.d.ts","sourceRoot":"","sources":["../../src/processes/WebProcess.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,aAAa,EAAE,MAAM,iBAAiB,CAAC;AAChD,OAAO,EAAE,MAAM,EAAE,MAAM,mBAAmB,CAAC;AAC3C,OAAO,EAAE,YAAY,EAAE,MAAM,iBAAiB,CAAC;AAG/C,qBAAa,UAAW,SAAQ,aAAa;gBAC/B,EAAE,EAAE,MAAM,EAAE,MAAM,EAAE,MAAM,EAAE,YAAY,EAAE,YAAY;IAI5D,GAAG;CAQV"}

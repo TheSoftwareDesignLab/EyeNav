@@ -1,0 +1,1 @@
+cp -i ../server/test_sessions/test_session_*.feature features/
