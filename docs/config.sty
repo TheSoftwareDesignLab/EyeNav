@@ -1,0 +1,35 @@
+\ProvidesPackage{../config}[2024/11/28 Custom configuration package]
+
+\RequirePackage[hmargin=2cm]{geometry}
+\RequirePackage{tcolorbox}
+\RequirePackage[lighttt]{lmodern}
+
+\RequirePackage[]{Rosario}
+\RequirePackage[T1]{fontenc}
+
+\RequirePackage{xcolor}
+\definecolor{darkblue}{rgb}{0.0, 0.0, 0.5}
+
+\RequirePackage{titlesec}
+\titleformat{\section}
+  {\color{darkblue}\normalfont\Large\bfseries}
+  {\thesection}{1em}{}
+
+\RequirePackage{cprotect}
+\RequirePackage{enumitem}
+\RequirePackage{multirow}
+\RequirePackage{multicol}
+\setlength{\columnsep}{1cm}
+\renewcommand{\familydefault}{\sfdefault}
+\RequirePackage{graphicx}
+\RequirePackage{listings}
+\RequirePackage{color}
+
+\RequirePackage[natbibapa]{apacite}
+\RequirePackage{natbib}
+
+\RequirePackage{csquotes}
+
+\RequirePackage{pgfgantt}
+
+\pagenumbering{gobble}

@@ -33,6 +33,7 @@ number_words = {
 }
 control_words = ["input", "stop", "enter", "click", "back", "forward", "go"]
 
+typed_text_buffer = ""
 
 def get_transcription_file():
     return settings.transcription_file if settings.transcription_file else transcription_file
@@ -61,20 +62,8 @@ def log_interaction(interaction, *args, **kwargs):
         dictionary["direction"] = args[0]
         dictionary["units"] = args[1]
     
-    print(f"DEBUG: Interaction -> {interaction}")
     interaction_logger.interaction_queue.put(dictionary)
 
-
-def extract_number_from_words(words):
-    """
-    Extracts a number from a list of words
-    @param words: list of words
-    @return: number if found, None otherwise
-    """
-    for word in words:
-        if word in number_words:
-            return number_words[word]
-    return None
 
 
 def extract_direction_from_words(words):
@@ -95,7 +84,7 @@ def execute_command(command):
     Executes a command based on the given text
     @param command: text command
     """
-    global is_typing_mode
+    global is_typing_mode, typed_text_buffer
     
     command = command.lower()
     words = command.split()
@@ -104,34 +93,45 @@ def execute_command(command):
     log_transcription(command)
     # send command to socket
     message_queue.put(command)
+    
+    command_to_execute = None
 
     if is_typing_mode:
-        print(f"Typing: {command}")
+        print(f"INFO: Typing: {command}")
 
         if "stop" in words or "enter" in words:
-            print("Stopping typing mode...")
+            print("INFO: Stopping typing mode...")
             is_typing_mode = False
-            pyautogui.press("enter") 
-            log_interaction("input", command)
+            
+            if typed_text_buffer.strip():
+                log_interaction("input", typed_text_buffer.strip())
+                typed_text_buffer = ""
+            pyautogui.press("enter")
             return
         
         elif command in control_words:
-            print("Control word detected")
             is_typing_mode = False
+            
+            if typed_text_buffer.strip():
+                log_interaction("input", typed_text_buffer.strip())
+                typed_text_buffer = ""
             
             if command == "click":
                 pyautogui.click()
-                print("Mouse click performed")
+                print("INFO: Mouse click performed")
             return
 
+        
         filtered_words = [word for word in words if word not in control_words]
         if filtered_words:
-            pyautogui.write(' '.join(filtered_words)) 
+            typed_text = ' '.join(filtered_words)
+            typed_text_buffer += ' ' + typed_text 
+            pyautogui.write(' ' + typed_text)
         return
     
     # Start typing mode
     if "input" in words:
-        print("Entering typing mode...")
+        print("INFO: Entering typing mode...")
         is_typing_mode = True
         return
 
@@ -140,46 +140,38 @@ def execute_command(command):
         if "back" in words:
             pyautogui.hotkey('command', '[')
             log_interaction("back")
-            print("Going back")
+            print("INFO: Going back")
             return
         elif "forward" in words:
             pyautogui.hotkey('command', ']')
             log_interaction("forward")
-            print("Going forward")
+            print("INFO: Going forward")
             return
 
         try:
             direction = extract_direction_from_words(words)
             if direction is None:
-                print("No valid direction found")
+                print("INFO: No valid direction found")
                 return
-            
-            scroll_units = extract_number_from_words(words)
-            if scroll_units is None:
-                print("No valid number of units found")
-                return
-            
-            pyautogui.scroll(scroll_units * 10 * direction)
-            log_interaction(f"go {direction}", direction, scroll_units)
-            direction_text = "down" if direction == -1 else "up"
-            print(f"Scrolling {scroll_units} units {direction_text}")
+            pyautogui.scroll(10 * direction)
+            log_interaction(f"go", direction, 10)
         except (ValueError, IndexError):
-            print("Invalid scroll command")
+            print("INFO: Invalid scroll command")
         return
 
     if "back" in words:
         pyautogui.hotkey('command', '[')
         log_interaction("back")
-        print("Going back")
+        print("INFO: Going back")
     elif "forward" in words:
         pyautogui.hotkey('command', ']')
         log_interaction("forward")
-        print("Going forward")
+        print("INFO: Going forward")
     
 
     if "click" in words:
         pyautogui.click()
-        print("Mouse click performed")
+        print("INFO: Mouse click performed")
 
 
 def recognize_voice():
@@ -194,7 +186,7 @@ def recognize_voice():
             result_json = json.loads(result)
             command = result_json.get("text", "")
             if command:
-                print(f"VOICE COMMAND HEARD: {command}")
+                print(f"INFO: Voice command heard -> {command}")
                 execute_command(command)
 
 

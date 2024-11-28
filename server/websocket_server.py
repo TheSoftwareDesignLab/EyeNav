@@ -13,11 +13,10 @@ class WebSocketApp(WebSocketApplication):
     
     def on_message(self, message):
         if message:
-            print(f"Received: {message}")
             self.ws.send(f"Echo: {message}")
 
     def on_close(self, reason):
-        print("WebSocket connection closed")
+        print("INFO: WebSocket connection closed")
         connected_clients.remove(self.ws)
 
     def keep_alive(self):
@@ -26,7 +25,7 @@ class WebSocketApp(WebSocketApplication):
                 self.ws.send('ping')
                 time.sleep(30)  
             except Exception as e:
-                print(f"Error sending ping: {e}")
+                print(f"INFO: Error sending ping to WebSocket: {e}")
                 break
 
 
@@ -47,7 +46,7 @@ def send_message_from_queue():
                     ws.send(command)
 
         except Exception as e:
-            print(f"Error sending message: {e}")
+            print(f"INFO: Error sending message to WebSocket: {e}")
         time.sleep(1)
 
 

@@ -58,7 +58,7 @@ function isClickable(element) {
 }
 
 /**
- * Get the XPath of an element
+ * Get the full XPath of an element
  * @param {HTMLElement} element
  * @returns {string}
  */
@@ -66,13 +66,21 @@ function getXPath(element) {
     if (element.id) return `//*[@id="${element.id}"]`;
     if (element === document.body) return '/html/body';
 
-    let ix = 0;
-    let siblings = element.parentNode ? Array.from(element.parentNode.childNodes) : [];
-    for (let i = 0; i < siblings.length; i++) {
-        const sibling = siblings[i];
-        if (sibling === element) return `${getXPath(element.parentNode)}/${element.tagName.toLowerCase()}[${ix + 1}]`;
-        if (sibling.nodeType === 1 && sibling.tagName === element.tagName) ix++;
+    let parts = [];
+    while (element && element.nodeType === Node.ELEMENT_NODE) {
+        let ix = 0;
+        let siblings = element.parentNode ? Array.from(element.parentNode.childNodes) : [];
+        for (let i = 0; i < siblings.length; i++) {
+            const sibling = siblings[i];
+            if (sibling === element) {
+                parts.unshift(`${element.tagName.toLowerCase()}[${ix + 1}]`);
+                break;
+            }
+            if (sibling.nodeType === 1 && sibling.tagName === element.tagName) ix++;
+        }
+        element = element.parentNode;
     }
+    return parts.length ? '/' + parts.join('/') : null;
 }
 
 /**
@@ -165,7 +173,7 @@ function handleClick(event) {
 
     const tagData = {
         tagName: element.tagName.toLowerCase(),
-        href: element.href || null,
+        href: element.getAttribute('href') || null,
         id: element.id || null,
         className: element.className || null,
         xpath: getXPath(element),

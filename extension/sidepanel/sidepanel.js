@@ -149,18 +149,39 @@ document.addEventListener('DOMContentLoaded', function() {
      * Display NLP command in the side panel UI
      * @param {string} command - The NLP command to display
      */
+    let inputMode = false;
+    let highlightedWord = '';
+
     function displayNLPCommand(command) {
         console.log('EYENAV: NLP Command:', command);
         const commandElement = document.createElement('p');
+        commandElement.style.fontSize = '20px';
+        commandElement.style.fontWeight = 'bold';
+        commandElement.style.textAlign = 'center';
         
         // Highlight control words
         const controlWords = ["input", "stop", "enter", "click", "back", "forward", "go"];
-        const highlightedCommand = command.split(' ').map(word => {
-            return controlWords.includes(word.toLowerCase()) ? `<span style="color: green;">${word}</span>` : word;
+        const words = command.split(' ');
+        let tempInputMode = inputMode;
+        const highlightedCommand = words.map(word => {
+            if (controlWords.includes(word.toLowerCase())) {
+                highlightedWord = `<span style="color: green;">${word}</span>`;
+                if (word.toLowerCase() === 'input') {
+                    tempInputMode = true;
+                } else if (word.toLowerCase() === 'stop' || word.toLowerCase() === 'enter') {
+                    tempInputMode = false;
+                }
+            } else {
+                highlightedWord = tempInputMode ? `<span style="color: blue;">${word}</span>` : word;
+            }
+            return highlightedWord;
         }).join(' ');
 
-        commandElement.innerHTML = 'Recognized: ' + highlightedCommand;
+        commandElement.innerHTML = highlightedCommand;
         voiceCommand.innerHTML = '';
         voiceCommand.appendChild(commandElement);
+        inputMode = tempInputMode;
+
+        voiceCommand.style.color = inputMode ? 'blue' : 'black';
     }
 });

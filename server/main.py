@@ -92,6 +92,7 @@ def tag_info():
             "id": element_id, 
             "xpath": xpath})
     
+
     return jsonify({"status": "Tag information received"}), 200
 
 

@@ -26,31 +26,36 @@ def define_interaction(interaction):
     @param interaction: The interaction dictionary
     @return: The string representation of the interaction
     """
+    
+    text = None
     if interaction["type"] == "click":
         if interaction["href"]:
-            return f'\tAnd I click on tag with selector {interaction["selector"]} with href "{interaction["href"]}"'
+            text = f'\tAnd I click on tag with selector {interaction["selector"]} with href "{interaction["href"]}"'
         elif interaction["id"]:
-            return f'\tAnd I click on tag with selector {interaction["selector"]} with id "{interaction["id"]}"'
+            text = f'\tAnd I click on tag with selector {interaction["selector"]} with id "{interaction["id"]}"'
         else:
-            return f'\tAnd I click on tag with selector {interaction["selector"]} with xpath "{interaction["xpath"]}"'
+            text = f'\tAnd I click on tag with xpath "{interaction["xpath"]}"'
     elif interaction["type"] == "input":
-        return f'\tAnd I input "{interaction["text"]}"'
+        text = f'\tAnd I input "{interaction["text"]}"'
     elif interaction["type"] == "back":
-        return f'\tAnd I go back'
+        text = f'\tAnd I go back'
     elif interaction["type"] == "forward":
-        return f'\tAnd I go forward'
+        text = f'\tAnd I go forward'
     elif interaction["type"] == "go":
-        return f'\tAnd I scroll {interaction["direction"]} {interaction["units"]}'
-    else:
-        return None
+        if interaction["direction"] > 0:
+            text = f'\tAnd I scroll down'
+        else:
+            text = f'\tAnd I scroll up'
+    
+    return text
     
 
 def main():
     while True:
         try:
             interaction = interaction_queue.get()
-            print(f"Logging interaction: {interaction}")
+            print(f"INFO: Logging interaction {interaction}")
             log_interaction(interaction)
         except Exception as e:
-            print(f"Error logging interaction: {e}")
+            print(f"INFO: Error logging interaction: {e}")
         time.sleep(1)
