@@ -1,47 +1,3 @@
-// Constants
-const TOOLTIP_ID = 'hoverTooltip';
-const HIGHLIGHT_STYLE_ID = 'hoverHighlightStyle';
-const MAX_WIDTH = '500px';
-
-// Global variables
-let hoverTooltipEnabled = false;
-let hoverHighlightEnabled = false;
-let tooltip = null;
-let hoverStartTime = null;
-let currentHoveredElement = null;
-
-/**
- * Tooltip creation
- */
-function createTooltip() {
-    tooltip = document.createElement('div');
-    tooltip.id = TOOLTIP_ID;
-    tooltip.style.position = 'absolute';
-    tooltip.style.backgroundColor = 'white';
-    tooltip.style.border = '1px solid black';
-    tooltip.style.padding = '5px';
-    tooltip.style.zIndex = '1000';
-    tooltip.style.display = 'none';
-    tooltip.style.maxWidth = MAX_WIDTH;
-    tooltip.style.overflow = 'auto';
-    document.body.appendChild(tooltip);
-}
-
-/**
- * Highlight style creation
- */
-function createHighlightStyle() {
-    const highlightStyle = document.createElement('style');
-    highlightStyle.id = HIGHLIGHT_STYLE_ID;
-    highlightStyle.textContent = `
-    .hover-highlight {
-        outline: 2px solid red;
-        outline-offset: -2px;
-    }
-    `;
-    document.head.appendChild(highlightStyle);
-}
-
 /**
  * Check if an element is clickable
  * @param {HTMLElement} element
@@ -94,71 +50,6 @@ function isRelevantElement(element) {
         ['a', 'button', 'input', 'select', 'textarea', 'div', 'span'].includes(element.tagName.toLowerCase()) ||
         (element.onclick || element.getAttribute('role') === 'button' || element.hasAttribute('tabindex')) ||
         (element.href !== undefined && element.href !== '');
-}
-
-/**
- * Update the tooltip with the element's outer HTML
- * @param {MouseEvent} event
- */
-function updateTooltip(event) {
-    const element = event.target;
-    const outerHTML = element.outerHTML;
-
-    if (!hoverTooltipEnabled && !hoverHighlightEnabled) {
-        hideTooltip();
-        removeHighlight(element);
-        return;
-    }
-
-    if (hoverHighlightEnabled) {
-        highlightElement(element);
-    }
-
-    if (hoverTooltipEnabled && isClickable(element)) {
-        showTooltip(outerHTML);
-    } else {
-        hideTooltip();
-        removeHighlight(element);
-    }
-}
-
-/**
- * Hide the tooltip
- */
-function hideTooltip() {
-    tooltip.style.display = 'none';
-    removeHighlight(currentHoveredElement);
-    currentHoveredElement = null;
-}
-
-/**
- * Show the tooltip with the given content
- * @param {string} content
- */
-function showTooltip(content) {
-    tooltip.style.display = 'block';
-    tooltip.style.left = `${event.pageX + 10}px`;
-    tooltip.style.top = `${event.pageY + 10}px`;
-    tooltip.innerText = content;
-}
-
-/**
- * Highlight an element
- * @param {HTMLElement} element
- */
-function highlightElement(element) {
-    element.classList.add('hover-highlight');
-    currentHoveredElement = element;
-}
-
-/**
- * Remove the highlight from an element
- * @param {HTMLElement} element
- */
-function removeHighlight(element) {
-    if (element) {
-        element.classList.remove('hover-highlight');
-    }
 }
 
 /**
@@ -228,35 +119,9 @@ function mutationCallback(mutations) {
  * Add event listeners
  */
 function addEventListeners() {
-    document.addEventListener('mousemove', updateTooltip, true); // Capture phase
-    document.addEventListener('mouseout', hideTooltip, true);  // Capture phase
     document.addEventListener('click', handleClick, true);  // Capture phase
 }
 
-// /** TODO unused
-//  * Remove event listeners
-//  */
-// function removeEventListeners() {
-//     document.removeEventListener('mousemove', updateTooltip, true);
-//     document.removeEventListener('mouseout', hideTooltip, true);
-//     document.removeEventListener('click', handleClick, true);
-// }
-
-// Chrome storage and message listener
-chrome.storage.sync.get(['hover', 'highlight'], function (result) {
-    hoverTooltipEnabled = result.hover || false;
-    hoverHighlightEnabled = result.highlight || false;
-});
-
-chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-    if (request.action === 'toggleHover') {
-        hoverEnabled = request.enabled;
-        if (!hoverEnabled) {
-            hideTooltip();
-            removeHighlight(currentHoveredElement);
-        }
-    }
-});
 
 /**
  * Main initialization function
@@ -264,9 +129,6 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 function initialize() {
     console.log('EyeNav content script initialized');
     
-    createTooltip();
-    createHighlightStyle();
-
     addEventListeners();
 
     const observer = new MutationObserver(mutationCallback);

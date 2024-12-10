@@ -1,0 +1,71 @@
+\documentclass[letterpaper, 12pt]{article}
+\usepackage{inputenc}
+\usepackage{../config} 
+\date{}
+
+
+
+\begin{document}
+
+% Title page
+
+\include{titlepage/titlepage}
+\tableofcontents
+
+\parskip = 10pt
+
+% Abstract
+
+\include{sections/abstract/abstract}
+
+% General Objective
+
+\include{sections/objectives/general}
+
+% Specific Objectives
+
+\include{sections/objectives/specific}
+
+% Conceptual Framework
+
+\twocolumn
+
+\include{sections/conceptual-framework/concfrwk}
+
+% Related Work
+
+\include{sections/related-work/rltwrk}
+
+% Methodology
+
+\include{sections/methodology/methodology}
+
+% Results
+\onecolumn
+
+\include{sections/results/results}
+
+% Discussion
+
+\include{sections/discussion/discussion}
+
+% Future Work
+
+\include{sections/future-work/ftrwrk}
+
+% Conclusions
+
+
+\include{sections/conclusions/conclusions}
+
+
+% Bibliography
+
+\newpage
+\addcontentsline{toc}{section}{References}
+\nocite{*}
+\bibliographystyle{apacite}
+\setlength{\bibsep}{1em} % Adjust the space between bibliography entries
+\bibliography{bibliography.bib}
+
+\end{document}

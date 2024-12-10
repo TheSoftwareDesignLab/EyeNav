@@ -1,16 +1,14 @@
 .DS_Store
 
-server/test_sessions/
-server/transcriptions/
+backend/test_sessions/
+backend/transcriptions/
 
-server/rosetta-env/
+backend/rosetta-env/
 experiments/
 
-server/__pycache__/
+backend/__pycache__/
 
 testing/reports/
-
-KrakenMobile-1.0.9
 
 TODO.md
 
