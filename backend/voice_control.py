@@ -107,6 +107,7 @@ def execute_command(command):
                 log_interaction("input", typed_text_buffer.strip())
                 typed_text_buffer = ""
             pyautogui.press("enter")
+            log_interaction("enter")
             return
         
         elif command in control_words:

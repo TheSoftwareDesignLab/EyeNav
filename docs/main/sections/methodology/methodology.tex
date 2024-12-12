@@ -10,12 +10,12 @@ The external hardware required for developing the project will be described in d
 
 \begin{figure}[ht]
     \centering
-    \includegraphics[width=0.4\textwidth]{images/tobii-pro-nano.png}
+    \includegraphics[width=0.7\textwidth]{images/tobii-pro-nano.png}
     \caption{Tobii Pro Nano Eye Tracker. Source: \citep{manual:tobiipronano}}
     \label{fig:tobii-eye-tracker}
 \end{figure}
 
-The Tobii Pro Nano Eye Tracker, shown above in figure \ref{fig:tobii-eye-tracker}, uses a corneal reflection, dark and bright pupil combination, one-camera system. It supports screen sizes up to 19 inches, introduces a 17 ms system latency. \citep{manual:tobiipronano}
+The Tobii Pro Nano Eye Tracker, shown in figure \ref{fig:tobii-eye-tracker}, uses a corneal reflection, dark and bright pupil combination, one-camera system. It supports screen sizes up to 19 inches, introduces a 17 ms system latency. \citep{manual:tobiipronano}
 
 It is characterized by its lightweight and compact form; which makes it easy to carry, and ultimately enabled an easier usability testing process. On the other hand, Tobii Eye Trackers are compatible with the \verb|tobii-research| SDK for python, which allows for controlling the device without the need for a graphical user interface.
 
@@ -27,9 +27,11 @@ The microphone serves as a mediator of interaction, enabling the capture of verb
 
 \subsection{System Design}
 
-The software developed 
+Given the system requirements and all of the peripherals it has to handle, a software architectural design was needed, in order to satisfy all the functional and non-functional requirements.
 
 \subsubsection{Software Architecture}
+
+% TODO explain each diagram and why it was decided like that
 
 \begin{figure}[ht]
     \centering
@@ -37,6 +39,8 @@ The software developed
     \caption{Architecture described in components}
     \label{fig:components-diagram}
 \end{figure}
+
+% The software components are shown in figure \ref{fig:components-diagram}, where 
 
 \begin{figure}[ht]
     \centering

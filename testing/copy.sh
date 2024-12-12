@@ -1,1 +1,1 @@
-cp -i ../server/test_sessions/test_session_*.feature features/
+cp -i ../backend/test_sessions/test_session_*.feature features/

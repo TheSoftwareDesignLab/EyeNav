@@ -30,13 +30,15 @@ def define_interaction(interaction):
     text = None
     if interaction["type"] == "click":
         if interaction["href"]:
-            text = f'\tAnd I click on tag with selector {interaction["selector"]} with href "{interaction["href"]}"'
+            text = f'\tAnd I click on tag with href "{interaction["href"]}"'
         elif interaction["id"]:
-            text = f'\tAnd I click on tag with selector {interaction["selector"]} with id "{interaction["id"]}"'
+            text = f'\tAnd I click on tag with id "{interaction["id"]}"'
         else:
             text = f'\tAnd I click on tag with xpath "{interaction["xpath"]}"'
     elif interaction["type"] == "input":
         text = f'\tAnd I input "{interaction["text"]}"'
+    elif interaction["type"] == "enter":
+        text = f'\tAnd I hit enter'
     elif interaction["type"] == "back":
         text = f'\tAnd I go back'
     elif interaction["type"] == "forward":
