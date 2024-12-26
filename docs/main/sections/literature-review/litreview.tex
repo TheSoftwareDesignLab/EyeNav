@@ -2,9 +2,9 @@
 
 \subsection{Eye Tracking}
 
-Eye Tracking refers to "the use of proper techniques and tools for the identification of a subject's gaze direction; in other words, eye tracking allows detecting and recording what users watch, typically, but not necessarily, on a screen" \citep{inproc:eyetracking-2014}. This technique can be measured and applied in different disciplines, which will be explained in the following sections.
+Eye Tracking refers to "the use of proper techniques and tools for the identification of a subject's gaze direction; in other words, eye tracking allows detecting and recording what users watch, typically, but not necessarily, on a screen" \citep{inproc:eyetracking-2014}. This technique can be measured and applied in different disciplines, which will be explained in the following sections. 
 
-\cite{art:gaze-hci-2023} point out that there are mainly two different kinds of Eye Trackers:
+\citet{art:gaze-hci-2023} point out that there are mainly two different kinds of Eye Trackers:
 \begin{enumerate}
     \item \textit{Remote}, the selected type for the project, which are non-intrusive devices positioned at the bottom of the display.
     \item \textit{Wearable}, that are installed in a pair of glasses, for instance, and are able to track outside of digital environments.
@@ -12,11 +12,11 @@ Eye Tracking refers to "the use of proper techniques and tools for the identific
 
 \subsubsection{Gaze}
 
-Gaze is usually associated with a fixed or steady look, however in this field it is used to describe the approximate point on screen where the subject is fixating their eyes. \cite{inproc:eyetracking-2014} have explained that to obtain this information in Eye Trackers, gaze direction is obtained during an initial calibration phase, which determines the correspondences between the points observed by the subject on the screen, and the positions of the cornea. 
+Gaze is usually associated with a fixed or steady look, however in this field it is used to describe the approximate point on screen where the subject is fixating their eyes. \citet{inproc:eyetracking-2014} have explained that to obtain this information in Eye Trackers, gaze direction is obtained during an initial calibration phase, which determines the correspondences between the points observ- ed by the subject on the screen, and the positions of the cornea. 
 
 \subsubsection{Accuracy and Precision}
 
-These two concepts have various applications, like in data science for example, but can be used in this context to understand how the Eye Tracker is performing. Following the manufacturer definitions, accuracy refers to the discrepancy between the true gaze position and the location recorded by the eye tracker, reflecting the systematic error or spatial accuracy of the data. On the other hand, precision indicates the consistency of the eye tracker in capturing the same gaze point across successive samples. It is quantified using the Root Mean Square (RMS) of the recorded points to assess the variation in the data. \citep{misc:acc-prec-tobii-2023}
+Accuracy and precision have various applications, like in data science for example, but can be used in this context to understand how the Eye Tracker is performing. Following the manufacturer definitions, accuracy refers to the discrepancy between the true gaze position and the location recorded by the eye tracker, reflecting the systematic error or spatial accuracy of the data. On the other hand, precision indicates the consistency of the eye tracker in capturing the same gaze point across successive samples. It is quantified using the Root Mean Square (RMS) of the recorded points to assess the variation in the data. \citep{misc:acc-prec-tobii-2023}
 
 \begin{figure}[ht]
     \centering
@@ -51,7 +51,7 @@ These two concepts have various applications, like in data science for example, 
 
 Natural Language Processing (NLP) is a field of artificial intelligence that focuses on the interaction between computers and humans through natural language. The goal of NLP is to enable computers to understand, interpret, and generate human language in a way that is both meaningful and useful. As \cite{book:nlp-2022} describes it, "[Natural Language Processing] addresses the various ways in computers can deal with natural—that is human—language"
 
-NLP encompasses several core tasks. These techniques provide the foundation for building more complex systems capable of handling a wide range of applications. For instance, here are some that \cite{book:nlp-2022} describes in her book:
+NLP encompasses several core tasks. These techniques provide the foundation for building more complex systems capable of handling a wide range of applications. For instance, here are some that \cite{book:nlp-2022} describes:
 
 \begin{itemize}
     \item Tokenization
@@ -73,37 +73,26 @@ NLP encompasses several core tasks. These techniques provide the foundation for 
 
 \subsubsection{Applications}
 
-% TODO
-
-% \begin{itemize}
-%     \item Search Engines
+\begin{itemize}
+    \item Assistive Technologies
     
-%     NLP powers search engines by enabling them to interpret user queries, rank relevant content, and provide accurate results. Techniques like query expansion, semantic search, and text ranking are key components %\citep{inproc:search-nlp-2021}.
+    Assistive tools such as screen readers, language translation systems, and real-time transcription services leverage NLP to improve accessibility for individuals with disabilities. For instance, \cite{art:nlp-2019} used it to create a hearing aid for students with disabilities, to carry their academic tasks with normalcy.
 
-%     \item Assistive Technologies
-    
-%     Assistive tools such as screen readers, language translation systems, and real-time transcription services leverage NLP to improve accessibility for individuals with disabilities 
-%     % \citep{art:assistive-nlp-2023}.
+    \item Smart Voice Assistants
 
-%     \item Transcriptions
-
-%     Automated transcription services use NLP to convert spoken language into text. These systems rely on speech recognition combined with language modeling to ensure accurate transcription 
-%     % \citep{misc:speech-transcription-2022}.
-
-%     \item Smart Voice Assistants
-
-%     Smart assistants like Siri, Alexa, and Google Assistant are powered by NLP, enabling them to understand voice commands, process natural language queries, and generate spoken responses 
-%     % \citep{art:voice-nlp-2024}.
-% \end{itemize}
+    Smart assistants like Siri and others are powered by natural language processing, enabling them to understand voice commands, process natural language queries, and generate spoken responses 
+    \citep{art:voiceassistants-2020}.
+\end{itemize}
 
 
 \subsection{Record And Replay Testing}
 
-% TODO research and cites
+A record/replay tool for web applications functions by capturing user inputs and interactions, such as mouse clicks, keyboard inputs, and navigation commands, during the application's use. These actions are then replayed by reapplying the recorded inputs to the browser engine during playback. \citep{inproc:recordreplay-2016}
 
 \subsubsection{Gherkin Syntax}
 
-All of the testing developed was possible thanks to the Kraken module developed by \cite{art:kraken-2023}. These tests are made using the Gherkin syntax and WebdriverIO, which enables controlling the browser for automated testing scenarios.
+All of the testing features developed were possible thanks to the Kraken framework. These tests are made using the Gherkin syntax and WebdriverIO, which enables controlling the browser for automated testing scenarios. \citep{art:kraken-2023}
 
+Gherkin syntax is a language that allows for instructions to be written in natural language. The language can bridge the gap between technical and non-technical team members, promoting a unified approach to defining requirements. It employs a set of keywords such as \verb|Given|, \verb|When| and \verb|Then| that each outline preconditions, actions and expected outcomes respectively. \cite{misc:cucumber-gherkin-2023}
 
 

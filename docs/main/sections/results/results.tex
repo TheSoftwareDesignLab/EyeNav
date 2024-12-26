@@ -2,12 +2,10 @@
 
 \subsection{System}
 
-All of the source code for this project is hosted in a GitHub repository.\footnote{https://github.com/juanyepesp/EyeNav} The repository holds the code for this documentation, the backend module, the chrome extension and the testing module.
-
 \begin{figure}[ht]
     \centering
     \includegraphics[width=1\textwidth]{images/screenshots/eyenav-1.png}
-    \caption{First look of the extension working in Chrome}
+    \caption{Chrome extension}
     \label{fig:ss-1}
 \end{figure}
 
@@ -17,7 +15,7 @@ All of the source code for this project is hosted in a GitHub repository.\footno
         \centering
         \includegraphics[width=\textwidth]{images/screenshots/eyenav-click.png}
         \caption{Clicking an item}
-    \end{subfigure}%   
+    \end{subfigure}
     ~ 
     \begin{subfigure}[ht]{0.48\textwidth}
         \centering
@@ -26,10 +24,9 @@ All of the source code for this project is hosted in a GitHub repository.\footno
     \end{subfigure}
     \caption{Other actions that can be done}
     \label{figs:ss-2-3}
-
 \end{figure*}
 
-Figures \ref{fig:ss-1} and \ref{figs:ss-2-3} display the system in action. 
+Figures \ref{fig:ss-1} and \ref{figs:ss-2-3} display the system in action. %TODO more comments on the system itself
 
 \subsection{Usability}
 
@@ -37,11 +34,11 @@ Usability in itself is not an absolute metric, and needs to be defined in partic
 
 \subsubsection{System Usabillity Scale}
 
-The system usability scale (SUS) is useful for understanding broad and general measurements of usability. Proposed by \cite{art:sus-1996}, this scale is widely used in systems engineering, and consists of 10 questions that the user will assess subjectively, but ultimately can point out how the system in three points:
+The system usability scale (SUS) is useful for understanding broad and general measurements of usability. Proposed by \cite{art:sus-1996}, this scale is widely used in systems engineering, and consists of 10 questions that the user will assess subjectively, but ultimately can point out how the system performed in three points:
 
 \begin{itemize}
     \item effectiveness (the ability of users to complete tasks using the system, and the quality of the output of those tasks)
-    \item efficiency ( the level of resource consumed in performing tasks)
+    \item efficiency (the level of resource consumed in performing tasks)
     \item satisfaction (users subjective reactions to using the system). \citep{art:sus-1996}
 \end{itemize}
 
@@ -66,17 +63,33 @@ SUS have scores ranging from 0 to 100. Each individual score can be calculated l
     2.5 \left(20 \sum(s_1,s_3,s_5,s_7,s_9) - \sum(s_2,s_4,s_6,s_8,s_{10})\right) \label{eq:sus}
 \end{equation}
 
-Furthermore, in the usability tests conducted, the average SUS was \verb|76.7|, with the highest score being \verb|95| and the lowest \verb|55|. Indicating that the system was found to be quite usable.
+Furthermore, in the usability tests conducted, the average SUS was \verb|76.7|, with the highest score being \verb|95| and the lowest being \verb|55|. Indicating that the system was found to be quite usable.
 
+% TODO poner más de SUS
 
 \subsubsection{Interviews}
+Another method to evaluate the system's usability was through user interviews. Key insights from these interviews include:
 
-% TODO poner los comentarios de las entrevistas
+\begin{itemize}
+    \item The navigability and ease of use of the system are directly related to the specific scenario or webpage being interacted with. Users found it easier to use when performing straightforward tasks like purchasing a product or reading news, but more challenging when completing complex actions such as filling out forms.
+    \item The ease of reaching icons using eye-tracking is highly dependent on their size. Larger icons are generally easier to navigate to.
+    \item Environmental conditions significantly impact the system's usability, especially due to its reliance on voice recognition. In noisy environments, users found the system harder and less enjoyable to use.
+    \item Users expressed a desire for a feature that indicates the exact element the system is about to click, which could enhance interaction accuracy.
+    \item Most users felt comfortable using their voice and eyesight for interaction, describing this method as intuitive and user-friendly.
+    \item The response time for each action was deemed satisfactory by all users, indicating no significant delays.
+\end{itemize}
+
 
 \subsection{Accesibility}
 
 According to the \cite{techreport:webaim-2024}, \verb|95.9%| of webpages have at least one detectable accessibility error.
 
+\subsubsection{Interviews}
+
+\begin{itemize}
+    \item Accesibility in itself is an attribute of the webpage, so a lot of the tester users felt that this system did in facts leverage a new way for interacting with webpages, however if it did want to become more accessible, it would have to go hand in hand with the actual design of the webpage, that is, making the icons easier to reach, the text more readable, etc.
+    \item 
+\end{itemize}
 
 % TODO poner los comentarios de las entrevistas
 
@@ -85,18 +98,15 @@ According to the \cite{techreport:webaim-2024}, \verb|95.9%| of webpages have at
 The tests that the system performs are a set of actions that were recorded when the user was using the system. These actions are written as steps in Gherkin syntax, which are then interpreted and each one corresponds to a Webdriver action the s=testing module can replay. An example test is shown.
 
 \begin{lstlisting}
-    Feature: Replay of session on Nov 19 at 02:10:49 PM
+    Feature: Replay of session on Nov 11 at 02:48:38 PM
 
     @user1 @web
-    Scenario: User interacts with the web page named "Wikipedia, the free encyclopedia"
+    Scenario: User interacts with the web page named "Amazon.com. Spend less. Smile more."
     
-        Given I navigate to page "https://en.wikipedia.org/wiki/Main_Page"
-        And I click on tag with selector a with href "/wiki/Samantha_Harvey_(author)"
-        And I click on tag with selector a with href "/wiki/Ditton,_Kent"
-        And I click on tag with selector "input" with id "searchInput"
-        And I input "hello world"
-        And I click on tag with selector a with href "https://en.wikipedia.org/w/index.php?title=Special%3ASearch&search=%22Hello%2C+World%21%22+program&wprov=acrw1_0"
-        And I click on tag with selector a with href "/wiki/Computer_program"
-        And I go back
+        Given I navigate to page "https://www.amazon.com/"
+        And I click on tag with id "twotabsearchtextbox"
+        And I input "nike black shoes"
+        And I click on tag with id "nav-search-submit-button"
         And I scroll down
+        And I click on tag with xpath "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[1]/span[1]/div[1]/div[9]/div[1]/div[1]/span[1]/div[1]/div[1]/div[1]/span[1]/a[1]/div[1]"
 \end{lstlisting}
