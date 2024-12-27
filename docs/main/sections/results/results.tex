@@ -26,7 +26,7 @@
     \label{figs:ss-2-3}
 \end{figure*}
 
-Figures \ref{fig:ss-1} and \ref{figs:ss-2-3} display the system in action. %TODO more comments on the system itself
+Figures \ref{fig:ss-1} and \ref{figs:ss-2-3} illustrate the system in operation. The left side of the browser shows the webpage as it would appear in any web browser, while the right side features the side panel of the Chrome extension. This side panel must remain visible at all times for proper orchestration. Below the play button, the voice commands box displays recognized commands, with control words in green and input (typing mode) words in blue. At the bottom, a menu lists all available commands.
 
 \subsection{Usability}
 
@@ -65,37 +65,34 @@ SUS have scores ranging from 0 to 100. Each individual score can be calculated l
 
 Furthermore, in the usability tests conducted, the average SUS was \verb|76.7|, with the highest score being \verb|95| and the lowest being \verb|55|. Indicating that the system was found to be quite usable.
 
-% TODO poner más de SUS
 
-\subsubsection{Interviews}
+\subsubsection{User Feedback}
 Another method to evaluate the system's usability was through user interviews. Key insights from these interviews include:
 
 \begin{itemize}
-    \item The navigability and ease of use of the system are directly related to the specific scenario or webpage being interacted with. Users found it easier to use when performing straightforward tasks like purchasing a product or reading news, but more challenging when completing complex actions such as filling out forms.
-    \item The ease of reaching icons using eye-tracking is highly dependent on their size. Larger icons are generally easier to navigate to.
-    \item Environmental conditions significantly impact the system's usability, especially due to its reliance on voice recognition. In noisy environments, users found the system harder and less enjoyable to use.
-    \item Users expressed a desire for a feature that indicates the exact element the system is about to click, which could enhance interaction accuracy.
-    \item Most users felt comfortable using their voice and eyesight for interaction, describing this method as intuitive and user-friendly.
-    \item The response time for each action was deemed satisfactory by all users, indicating no significant delays.
+    \item Scenario-specific usability: The navigability and ease of use of the system are directly related to the specific scenario or webpage being interacted with. Users found it easier to use when performing straightforward tasks like purchasing a product or reading news, but more challenging when completing complex actions such as filling out forms.
+    \item Icon size: The ease of reaching icons using eye-tracking is highly dependent on their size. Larger icons are generally easier to navigate to.
+    \item Environmental conditions: These significantly impact the system's usability, especially due to its reliance on voice recognition. In noisy environments, users found the system harder and less enjoyable to use.
+    \item Interaction accuracy: Users expressed a desire for a feature that indicates the exact element the system is about to click, which could enhance interaction accuracy.
+    \item User comfort: Most users felt comfortable using their voice and eyesight for interaction, describing this method as intuitive and user-friendly.
+    \item Response time: The response time for each action was deemed satisfactory by all users, indicating no significant delays.
+    \item Voice control: Voice control seemed to be easier whenever control words were clearer and shorter. For instance, when the first prototype was developed, the user had to say in units how much they wanted to scroll, like "scroll down five units". This became a hassle and was ultimately decided that scrolling would be done in an arbitrary number of units that is intuitive.
 \end{itemize}
 
 
-\subsection{Accesibility}
+\subsection{Accessibility}
 
-According to the \cite{techreport:webaim-2024}, \verb|95.9%| of webpages have at least one detectable accessibility error.
-
-\subsubsection{Interviews}
+\subsubsection{User Feedback}
 
 \begin{itemize}
-    \item Accesibility in itself is an attribute of the webpage, so a lot of the tester users felt that this system did in facts leverage a new way for interacting with webpages, however if it did want to become more accessible, it would have to go hand in hand with the actual design of the webpage, that is, making the icons easier to reach, the text more readable, etc.
-    \item 
+    \item According to \cite{techreport:webaim-2024}, \verb|95.9%| of webpages have at least one detectable accessibility error. Accessibility is an attribute of the webpage itself, so many tester users felt that this system indeed leverages a new way of interacting with webpages. However, to become more accessible, it would need to align with the actual design of the webpage, such as making icons easier to reach and text more readable.
+    \item Due to the scope and time limitations of the project, testing with individuals with motor impairments was not possible. However, all users who tested the system suggested that this method of interaction could be beneficial for individuals with motor impairments. They even mentioned that if the system were more polished, they would consider using it regularly to be more productive.
 \end{itemize}
 
-% TODO poner los comentarios de las entrevistas
 
-\subsection{Test Scripts Generation}
+\subsection{Test Script Generation}
 
-The tests that the system performs are a set of actions that were recorded when the user was using the system. These actions are written as steps in Gherkin syntax, which are then interpreted and each one corresponds to a Webdriver action the s=testing module can replay. An example test is shown.
+The system's tests are a series of actions recorded during user interactions. These actions are documented in Gherkin syntax, which are then interpreted and mapped to corresponding Webdriver actions that the testing module can replay. Below is an example of a test script:
 
 \begin{lstlisting}
     Feature: Replay of session on Nov 11 at 02:48:38 PM
@@ -110,3 +107,5 @@ The tests that the system performs are a set of actions that were recorded when 
         And I scroll down
         And I click on tag with xpath "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[1]/span[1]/div[1]/div[9]/div[1]/div[1]/span[1]/div[1]/div[1]/div[1]/span[1]/a[1]/div[1]"
 \end{lstlisting}
+
+These actions are replayable thanks to the Kraken module. However, as webpages dynamically change and evolve, these tests have a limited lifespan. Despite this, they can be valuable for specific testing scenarios. For example, they can help determine how a webpage behaves when its size changes, how many clicks are required to perform the same action, and whether the flow of actions breaks if the webpage layout changes.

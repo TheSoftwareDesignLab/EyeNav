@@ -50,22 +50,19 @@ Figure \ref{fig:sequence-diagram} displays a sequence diagram where a user start
 
 This system works through the power of multithreading and concurrency, therefore, showcasing when each process is being called and by who helps to illustrate the functionality better.
 
-% TODO no sé si incluir más sobre la arquitectura?
+
 
 \subsection{Implementation}
 A prototype for this idea was developed, which lets the user control the web browser using their gaze visualization and voice for command instructions. The prototype is started using the frontend, and the backend needs to be running prior to said initialization. 
 
-All of the source code for this project is hosted in a GitHub repository.\footnote{https://github.com/juanyepesp/EyeNav} The repository holds the code for this documentation, the backend module, the chrome extension and the testing module.
+All of the source code for this project is hosted in a GitHub repository.\footnote{\url{https://github.com/juanyepesp/EyeNav}} The repository holds the code for this documentation, the backend module, the chrome extension and the testing module.
 
 \subsubsection{Chrome Extension}
-In Chrome version %TODO put chrome version here
-, it is possible to develop a sidepanel, which effectively gives the ability to create a secondary and completely independent webpage (or at least from the primary webpage) that is always visible to the user. This is an awesome capability since it allows for the system to display important information relevant to the user. For instance, the voice command that the voice recognition module detected, or the different commands that can be used and how, etc.
+In Chrome versions 114 and later, it is possible to develop a sidepanel, which effectively gives the ability to create a secondary and completely independent webpage (or at least from the primary webpage) that is always visible to the user. This is an awesome capability since it allows for the system to display important information relevant to the user. For instance, the voice command that the voice recognition module detected, or the different commands that can be used and how, etc.
 
-Developing a chrome extension, or at least one with a sidepanel, is effectively the same as doing a webpage. The only extra step to creating one is to use a \verb|manifest.json| that tells the browser the code will be packaged into an extension. The rest is plain javascript for functionality, HTML for structure and CSS for styles. \footnote{All of the code for this chrome extension can be found here.} %TODO add link
+Developing a chrome extension, or at least one with a sidepanel, is effectively the same as doing a webpage. The only extra step to creating one is to use a \verb|manifest.json| that tells the browser the code will be packaged into an extension. The rest is plain javascript for functionality, HTML for structure and CSS for styles. 
 
 There are also some tricky parts that needed to be adressed. Since the system needs to register which HTML tag the user clicks in a given moment, the extension needs to handle each click using an event listener. However, this needs to be implemented carefully for dynamically created elements, since adding an event listener on top can eliminate certain functionalities of the webpage.
-
-% TODO si se me ocurre otra cosa loca de implementar la extension
 
 \subsubsection{Backend}
 
@@ -80,11 +77,11 @@ As a disclaimer, every part of this system is running locally on a single comput
     
     \item \verb|commandQueue|
     
-    The commandQueue, is the tunnel of information for each voice command that the \verb|voiceControlModule| recognizes. It uses websockets instead of HTTP for ensuring a fast and streamlined command display; ensuring minimal latency perceived by the user in the chrome extension. 
+    The command queue, is the tunnel of information for each voice command that the voice control module recognizes. It uses websockets instead of HTTP for ensuring a fast and streamlined command display; ensuring minimal latency perceived by the user in the chrome extension. 
 
     \item \verb|loggerModule|
     
-    Similarly, this module also uses a queue for handling instruction writing on the testing files, called features. Each feature is created once the session is started, and needs to be handled on a Queue for impeding data races. 
+    Similarly, this module also uses a queue for handling instruction writing on the testing files, called features. Each feature is created once the session is started, and needs to be handled on a queue for impeding data races. 
     
     \item \verb|eyeTrackingModule|
     
@@ -98,7 +95,5 @@ As a disclaimer, every part of this system is running locally on a single comput
 
 \subsubsection{Testing}
 
-The testing module, is much more straightforward and concrete. The only necessary files to create were the step definition file and each feature (those are the tests to be executed). The step definitions are written in Gherkin syntax and include each action the user took; and they need to be defined for the webdriver to execute them. On the other hand, the features were created previously by the logger module.
-
-
+The testing module is much more straightforward and concrete, primarily due to the Kraken module handling most of the responsibilities. The only necessary files that had to be created were the step definition file and each feature (those are the tests to be executed). The step definitions are written in Gherkin syntax and include each action the user took; they need to be defined for the webdriver to execute them. On the other hand, the features were created previously by the logger module.
 
