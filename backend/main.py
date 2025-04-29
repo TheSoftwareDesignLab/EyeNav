@@ -35,6 +35,7 @@ def start_tracking():
     settings.transcription_file = os.path.join(settings.TRANSCRIPTION_DIR, f"transcription_{start_time}.log")
 
     data = request.get_json()
+    language = request.headers.get('Language', 'en')
     page_name = data.get('pageName')
     page_url = data.get('pageUrl')
 
@@ -50,15 +51,15 @@ def start_tracking():
         tracking_thread = threading.Thread(target=eye_tracking.start_eye_tracking)
         tracking_thread.start()
 
-        voice_thread = threading.Thread(target=voice_control.main)
+        voice_thread = threading.Thread(target=voice_control.main, args=(language,))
         voice_thread.start()
         
         logging_thread = threading.Thread(target=interaction_logger.main, daemon=True)
         logging_thread.start()
 
-        return jsonify({"status": "Eye tracking and voice control started"}), 200
+        return jsonify({"status": f"Eye tracking and voice control started in {language}"}), 200
     else:
-        return jsonify({"status": "Eye tracking is already running"}), 400
+        return jsonify({"status": f"Eye tracking is already running in {language}"}), 400
 
 
 @app.route('/stop', methods=['GET'])

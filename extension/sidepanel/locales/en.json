@@ -1,0 +1,22 @@
+{
+    "eyenav-title": "EyeNav",
+    "eyenav-desc": "EyeNav can understand the following words, just say them out loud",
+    "eyenav-start-message": "Start an orchestrated session",
+    "eyenav-ensure-server-running": "Ensure the server is running",
+    "eyenav-voice-commands": "Voice Commands",
+    "eyenav-click-title": "Click",
+    "eyenav-input-title": "Input",
+    "eyenav-go-title": "Go [up/down]",
+    "eyenav-back-title": "Back",
+    "eyenav-forward-title": "Forward",
+    "eyenav-click-desc": "Click an element",
+    "eyenav-input-desc": "After saying input, EyeNav will start typing whatever you want to write. Say either <strong>stop</strong> or <strong>enter</strong> to stop writing",
+    "eyenav-go-desc": "This will scroll up or down",
+    "eyenav-back-desc": "Takes you to the previous page",
+    "eyenav-forward-desc": "Takes you to the next page",
+    "initial-nlp-command": "Recognized voice commands will appear here",
+    "sessionStarted": "Session started",
+    "failedToStart": "Failed to start session",
+    "sessionStopped": "Session stopped",
+    "failedToStop": "Failed to stop session"
+}

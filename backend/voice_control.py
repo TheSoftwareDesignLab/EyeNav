@@ -1,4 +1,6 @@
 import pyautogui
+import pyperclip
+import platform
 import settings
 import os
 import queue
@@ -8,32 +10,39 @@ import time
 from vosk import Model, KaldiRecognizer
 from websocket_server import message_queue
 import interaction_logger
+from threading import Lock
 
 # Data structures
-
 command_to_execute = None 
 audio_queue = queue.Queue()
 is_voice_recognition_active = True
 is_typing_mode = False
-
-model = Model(lang="en-us")
-recognizer = KaldiRecognizer(model, 16000)
-
-number_words = {
-    "one": 1,
-    "two": 2,
-    "three": 3,
-    "four": 4,
-    "five": 5,
-    "six": 6,
-    "seven": 7,
-    "eight": 8,
-    "nine": 9,
-    "ten": 10
-}
-control_words = ["input", "stop", "enter", "click", "back", "forward", "go"]
-
 typed_text_buffer = ""
+model_lock = Lock()
+current_language = "en-us"
+language_config = {}
+
+def load_language_config(language_code):
+    global language_config
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "commands.json")
+    with open(config_path, "r", encoding="utf-8") as f:
+        all_configs = json.load(f)
+        language_config = all_configs.get(language_code, {})
+        if not language_config:
+            print(f"WARNING: Language config for {language_code} not found. Falling back to en-us.")
+            language_config = all_configs["en-us"]
+
+def set_voice_language(language_code):
+    global model, recognizer, current_language
+    with model_lock:
+        current_language = language_code
+        model = Model(lang=language_code)
+        recognizer = KaldiRecognizer(model, 16000)
+        load_language_config(language_code)
+
+
+def get_current_language():
+    return current_language
 
 def get_transcription_file():
     return settings.transcription_file if settings.transcription_file else transcription_file
@@ -72,10 +81,10 @@ def extract_direction_from_words(words):
     @param words: list of words
     @return: 1 for up, -1 for down, None otherwise
     """
-    if "up" in words:
-        return -1  # Scroll down is negative
-    elif "down" in words:
-        return 1  # Scroll up is positive
+    directions = language_config.get("directions", {})
+    for word in words:
+        if word in directions:
+            return directions[word]
     return None
 
 
@@ -88,18 +97,13 @@ def execute_command(command):
     
     command = command.lower()
     words = command.split()
-
-    # Log the recognized command
     log_transcription(command)
-    # send command to socket
     message_queue.put(command)
-    
-    command_to_execute = None
 
     if is_typing_mode:
         print(f"INFO: Typing: {command}")
 
-        if "stop" in words or "enter" in words:
+        if any(word in language_config.get("typing_exit", []) for word in words):
             print("INFO: Stopping typing mode...")
             is_typing_mode = False
             
@@ -110,40 +114,40 @@ def execute_command(command):
             log_interaction("enter")
             return
         
-        elif command in control_words:
+        elif command in language_config.get("control_words", []):
             is_typing_mode = False
             
             if typed_text_buffer.strip():
                 log_interaction("input", typed_text_buffer.strip())
                 typed_text_buffer = ""
             
-            if command == "click":
+            if command == language_config.get("click"):
                 pyautogui.click()
                 print("INFO: Mouse click performed")
             return
 
         
-        filtered_words = [word for word in words if word not in control_words]
+        filtered_words = [word for word in words if word not in language_config.get("control_words", [])]
         if filtered_words:
             typed_text = ' '.join(filtered_words)
             typed_text_buffer += ' ' + typed_text 
-            pyautogui.write(' ' + typed_text)
+            type(' ' + typed_text)
         return
     
     # Start typing mode
-    if "input" in words:
+    if language_config.get("typing_trigger") in words:
         print("INFO: Entering typing mode...")
         is_typing_mode = True
         return
 
     
-    if "go" in words:
-        if "back" in words:
+    if language_config.get("go") in words:
+        if language_config.get("back") in words:
             pyautogui.hotkey('command', '[')
             log_interaction("back")
             print("INFO: Going back")
             return
-        elif "forward" in words:
+        elif language_config.get("forward") in words:
             pyautogui.hotkey('command', ']')
             log_interaction("forward")
             print("INFO: Going forward")
@@ -160,20 +164,30 @@ def execute_command(command):
             print("INFO: Invalid scroll command")
         return
 
-    if "back" in words:
+    if language_config.get("back") in words:
         pyautogui.hotkey('command', '[')
         log_interaction("back")
         print("INFO: Going back")
-    elif "forward" in words:
+    elif language_config.get("forward") in words:
         pyautogui.hotkey('command', ']')
         log_interaction("forward")
         print("INFO: Going forward")
     
 
-    if "click" in words:
+    if language_config.get("click") in words:
         pyautogui.click()
         print("INFO: Mouse click performed")
 
+def type(text: str):
+    """
+    Workaround for pyautogui.write to avoid issues with special characters
+    @param text: text to type
+    """    
+    pyperclip.copy(text)
+    if platform.system() == "Darwin":
+        pyautogui.hotkey("command", "v")
+    else:
+        pyautogui.hotkey("ctrl", "v")
 
 def recognize_voice():
     """
@@ -210,10 +224,13 @@ def audio_callback(indata, frames, time, status):
     audio_queue.put(bytes(indata))
 
 
-def main():
+def main(language_code="en-us"):
     """
     Main function
     """
+    set_voice_language(language_code)
+    print(f"INFO: Starting voice control in {language_code}...")
+    
     global is_voice_recognition_active
     is_voice_recognition_active = True  
 

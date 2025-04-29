@@ -1,0 +1,50 @@
+{
+    "en-us": {
+        "control_words": [
+            "input",
+            "stop",
+            "enter",
+            "click",
+            "back",
+            "forward",
+            "go"
+        ],
+        "typing_exit": [
+            "stop",
+            "enter"
+        ],
+        "directions": {
+            "up": -1,
+            "down": 1
+        },
+        "click": "click",
+        "go": "go",
+        "typing_trigger": "input",
+        "back": "back",
+        "forward": "forward"
+    },
+    "es": {
+        "control_words": [
+            "escribir",
+            "detener",
+            "enviar",
+            "clic",
+            "atrás",
+            "adelante",
+            "ir"
+        ],
+        "typing_exit": [
+            "detener",
+            "enviar"
+        ],
+        "directions": {
+            "arriba": -1,
+            "abajo": 1
+        },
+        "click": "clic",
+        "go": "ir",
+        "typing_trigger": "escribir",
+        "back": "atrás",
+        "forward": "adelante"
+    }
+}

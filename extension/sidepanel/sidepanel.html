@@ -18,7 +18,7 @@
             <div class="logo">
                 <img src="assets/logo-light.png" alt="Accessibility Icon">
             </div>
-            <h1>EyeNav</h1>
+            <h1 id="eyenav-title"></h1>
             <div style="margin: 0.45cm;"></div>
             <!-- <a href="https://example.com/info" target="_blank">
                 <div class="info-icon">
@@ -32,18 +32,18 @@
                 <div id="play-button" class="play-button play">
                     <span>&#9658;</span>
                 </div>
-                <p id="alert-below-button" style="color: red;">Ensure the server is running</p>
+                <p id="alert-below-button" style="color: red;"></p>
             </div>
 
             <div class="voice-commands">
                 <div class="visualization-container" id="visualization-container">
-                    <p id="nlp-command">Recognized voice commands will appear here</p>
+                    <p id="nlp-command"></p>
                 </div>
 
                 <div class="spacer" style="height: 20px;"></div>
 
-                <h2>Voice Commands</h2>
-                <p>EyeNav can understand the following words, just say them out loud</p>
+                <h2 id="eyenav-voice-commands"></h2>
+                <p id="eyenav-desc"></p>
 
                 <table>
                     <tr>
@@ -51,48 +51,48 @@
                             <img src="assets/click.svg" width="30px" alt="Click Icon">
                         </td>
                         <td>
-                            <h2>Click</h2>
-                            <p>Click an element</p>
+                            <h2 id="eyenav-click-title"></h2>
+                            <p id="eyenav-click-desc"></p>
                         </td>
                     </tr>
 
                     <tr>
                         <td>
-                            <img src="assets/input.svg" width="30px" alt="Click Icon">
+                            <img src="assets/input.svg" width="30px" alt="Input Icon">
                         </td>
                         <td>
-                            <h2>Input</h2>
-                            <p>After saying input, EyeNav will start typing whatever you want to write. Say either <strong>stop</strong> or <strong>enter</strong> to stop writing</p>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td>
-                            <img src="assets/move.svg" width="30px" alt="Click Icon">
-                        </td>
-                        <td>
-                            <h2>Go [up/down]</h2>
-                            <p>This will scroll up or down</p>
+                            <h2 id="eyenav-input-title"></h2>
+                            <p id="eyenav-input-desc"></p>
                         </td>
                     </tr>
 
                     <tr>
                         <td>
-                            <img src="assets/arrow-back.svg" width="30px" alt="Click Icon">
+                            <img src="assets/move.svg" width="30px" alt="Go Icon">
                         </td>
                         <td>
-                            <h2>Back</h2>
-                            <p>Takes you to the previous page</p>
+                            <h2 id="eyenav-go-title"></h2>
+                            <p id="eyenav-go-desc"></p>
                         </td>
                     </tr>
 
                     <tr>
                         <td>
-                            <img src="assets/arrow-back.svg" width="30px" alt="Click Icon" style="transform: scaleX(-1);">
+                            <img src="assets/arrow-back.svg" width="30px" alt="Back Icon">
                         </td>
                         <td>
-                            <h2>Forward</h2>
-                            <p>Takes you to the next page</p>
+                            <h2 id="eyenav-back-title"></h2>
+                            <p id="eyenav-back-desc"></p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td>
+                            <img src="assets/arrow-back.svg" width="30px" alt="Forward Icon" style="transform: scaleX(-1);">
+                        </td>
+                        <td>
+                            <h2 id="eyenav-forward-title"></h2>
+                            <p id="eyenav-forward-desc"></p>
                         </td>
                     </tr>
                 </table>

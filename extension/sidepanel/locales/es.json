@@ -1,0 +1,22 @@
+{
+    "eyenav-title": "EyeNav",
+    "eyenav-desc": "EyeNav puede entender las siguientes palabras, solo di en voz alta",
+    "eyenav-start-message": "Iniciar una sesión orquestada",
+    "eyenav-ensure-server-running": "Asegúrate de que el servidor esté en ejecución",
+    "eyenav-voice-commands": "Comandos de voz",
+    "eyenav-click-title": "Clic",
+    "eyenav-input-title": "Escribir",
+    "eyenav-go-title": "Ir [arriba/abajo]",
+    "eyenav-back-title": "Atrás",
+    "eyenav-forward-title": "Adelante",
+    "eyenav-click-desc": "Clic en un elemento",
+    "eyenav-input-desc": "Después de decir escribir, EyeNav comenzará a escribir lo digas. Di <strong>detener</strong> o <strong>enviar</strong> para dejar de escribir",
+    "eyenav-go-desc": "Esto desplazará hacia arriba o hacia abajo",
+    "eyenav-back-desc": "Te lleva a la página anterior",
+    "eyenav-forward-desc": "Te lleva a la siguiente página",
+    "initial-nlp-command": "Los comandos de voz reconocidos aparecerán aquí",
+    "sessionStarted": "Sesión iniciada",
+    "failedToStart": "Error al iniciar sesión",
+    "sessionStopped": "Sesión detenida",
+    "failedToStop": "Error al detener la sesión"
+}
