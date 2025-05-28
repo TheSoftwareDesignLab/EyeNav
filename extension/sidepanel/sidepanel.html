@@ -2,41 +2,35 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>EyeNav</title>
-    <link rel="stylesheet" type="text/css" href="sidepanel.css">
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="sidepanel.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
 </head>
 
 <body>
     <div class="container">
         <div class="header">
             <div class="logo">
-                <img src="assets/logo-light.png" alt="Accessibility Icon">
+                <img src="assets/logo-light.png" alt="Accessibility Icon" />
             </div>
             <h1 id="eyenav-title"></h1>
             <div style="margin: 0.45cm;"></div>
-            <!-- <a href="https://example.com/info" target="_blank">
-                <div class="info-icon">
-                    <img src="assets/info.svg" alt="Info Icon">
-                </div>
-            </a> -->
         </div>
 
         <main>
             <div class="start-session">
-                <div id="play-button" class="play-button play">
-                    <span>&#9658;</span>
-                </div>
+                <button id="play-button" class="play-button play" aria-label="Start session">
+                    <span aria-hidden="true">&#9658;</span>
+                </button>
                 <p id="alert-below-button" style="color: red;"></p>
             </div>
 
             <div class="voice-commands">
-                <div class="visualization-container" id="visualization-container">
+                <div class="visualization-container" id="visualization-container" aria-live="polite">
                     <p id="nlp-command"></p>
                 </div>
 
@@ -47,48 +41,37 @@
 
                 <table>
                     <tr>
-                        <td>
-                            <img src="assets/click.svg" width="30px" alt="Click Icon">
-                        </td>
+                        <td><img src="assets/click.svg" width="30" alt="Click Icon" /></td>
                         <td>
                             <h2 id="eyenav-click-title"></h2>
                             <p id="eyenav-click-desc"></p>
                         </td>
                     </tr>
-
                     <tr>
-                        <td>
-                            <img src="assets/input.svg" width="30px" alt="Input Icon">
-                        </td>
+                        <td><img src="assets/input.svg" width="30" alt="Input Icon" /></td>
                         <td>
                             <h2 id="eyenav-input-title"></h2>
                             <p id="eyenav-input-desc"></p>
                         </td>
                     </tr>
-
                     <tr>
-                        <td>
-                            <img src="assets/move.svg" width="30px" alt="Go Icon">
-                        </td>
+                        <td><img src="assets/move.svg" width="30" alt="Go Icon" /></td>
                         <td>
                             <h2 id="eyenav-go-title"></h2>
                             <p id="eyenav-go-desc"></p>
                         </td>
                     </tr>
-
                     <tr>
-                        <td>
-                            <img src="assets/arrow-back.svg" width="30px" alt="Back Icon">
-                        </td>
+                        <td><img src="assets/arrow-back.svg" width="30" alt="Back Icon" /></td>
                         <td>
                             <h2 id="eyenav-back-title"></h2>
                             <p id="eyenav-back-desc"></p>
                         </td>
                     </tr>
-
                     <tr>
                         <td>
-                            <img src="assets/arrow-back.svg" width="30px" alt="Forward Icon" style="transform: scaleX(-1);">
+                            <img src="assets/arrow-back.svg" width="30" alt="Forward Icon"
+                                style="transform: scaleX(-1);" />
                         </td>
                         <td>
                             <h2 id="eyenav-forward-title"></h2>
@@ -99,6 +82,14 @@
             </div>
         </main>
     </div>
+
     <script src="sidepanel.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const playButton = document.getElementById('play-button');
+            playButton.focus();
+        });
+    </script>
 </body>
+
 </html>

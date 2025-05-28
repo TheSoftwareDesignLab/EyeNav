@@ -171,3 +171,8 @@ h2 {
     color: #666;
     margin: 0;
 }
+
+.play-button:focus {
+  outline: 3px solid yellow;
+  outline-offset: 3px;
+}
