@@ -1,37 +1,33 @@
 <!DOCTYPE html>
-<html lang="{{ site.lang | default: " en-US" }}">
-
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/png" href="../assets/imgs/droidpool.ico">
-  <!-- <link href="assets/css/bootstrap.min.css" rel="stylesheet"> -->
-  {% seo %}
-  <link rel="stylesheet" href="{{ " /assets/css/style.css?v=" | append: site.github.build_revision | relative_url }}">
-  <!--[if lt IE 9]>
+<html lang="{{ site.lang | default: "en-US" }}">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/png" href="../assets/imgs/droidpool.ico">
+    <!-- <link href="assets/css/bootstrap.min.css" rel="stylesheet"> -->
+{% seo %}
+    <link rel="stylesheet" href="{{ "/assets/css/style.css?v=" | append: site.github.build_revision | relative_url }}">
+    <!--[if lt IE 9]>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv.min.js"></script>
     <![endif]-->
-</head>
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1 class="title-logo" align="center" style="margin-bottom: 10px;">
+          <a href="{{ '/' | absolute_url }}">
+            <span style="color: black">Eye</span><span style="color: #413AA1">Nav</span>
+          </a>
+        </h1>
 
-<body>
-  <div class="wrapper">
-    <header>
-      <h1 class="title-logo" align="center" style="margin-bottom: 10px;">
-        <a href="{{ '/' | absolute_url }}">
-          <span style="color: black">Eye</span><span style="color: #413AA1">Nav</span>
-        </a>
-      </h1>
+        {% if site.logo %}
+          <p align="center" style="margin-bottom: 0px;"><img src="{{site.logo | relative_url}}" alt="Logo" style="height: 130px" /></p>
+        {% endif %}
 
+        <p style="margin-bottom: 7px">{{ site.description | default: site.github.project_tagline }}</p>
 
-      {% if site.logo %}
-      <p align="center" style="margin-bottom: 0px;"><img src="{{site.logo | relative_url}}" alt="Logo"
-          style="height: 130px" /></p>
-      {% endif %}
-
-      <p style="margin-bottom: 7px">{{ site.description | default: site.github.project_tagline }}</p>
-
-      {% if site.show_downloads %}
+        {% if site.show_downloads %}
         <ul class="downloads" style="margin-bottom: 7px">
           <li><a href="{{ site.github.zip_url }}">Download <strong>ZIP File</strong></a></li>
           <li><a href="{{ site.github.tar_url }}">Download <strong>TAR Ball</strong></a></li>
@@ -39,49 +35,49 @@
         </ul>
         {% endif %}
 
-      <h3 style="margin-bottom: 7px">Team Members</h3>
-      <ul class="toc">
-        <li><a href="https://www.linkedin.com/in/juan-diego-yepes-parra/">Juan Diego Yepes-Parra</a></li>
-        <li><a href="https://caev03.github.io/">Camilo Escobar-Velásquez</a></li>
-      </ul>
-      <h3 style="margin-bottom: 7px">Table of Contents</h3>
-      <ol class="toc">
-        <!-- TODO -->
-        <li><a href="#purpose">Purpose</a></li>
-        <li><a href="#video">Video</a></li>
-        <!-- <li><a href="#temporal-anchor">Temporal Anchor</a></li> -->
-      </ol>
-    </header>
-    <section>
+        <h3 style="margin-bottom: 7px">Team Members</h3>
+        <ul class="toc">
+          <li><a href="https://www.linkedin.com/in/juan-diego-yepes-parra/">Juan Diego Yepes-Parra</a></li>
+          <li><a href="https://caev03.github.io/">Camilo Escobar-Velásquez</a></li>
+        </ul>
+        <h3 style="margin-bottom: 7px">Table of Contents</h3>
+        <ol class="toc">
+          <!-- TODO -->
+          <li><a href="#purpose">Purpose</a></li>
+          <li><a href="#video">Video</a></li>
+          <!-- <li><a href="#temporal-anchor">Temporal Anchor</a></li> -->
+        </ol>
+      </header>
+      <section>
 
       {{ content }}
 
-    </section>
-    <footer>
-      {% if site.github.is_project_page %}
-      <p>This project is maintained by <a href="https://thesoftwaredesignlab.github.io/"><img
-            src="{{site.tsdllogo | relative_url}}" alt="{{ site.github.owner_name }}" srcset=""
-            style="width: 200px; padding-top: 5px;"></a></p>
-      {% endif %}
-    </footer>
-  </div>
-  <!-- <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+      </section>
+      <footer>
+        {% if site.github.is_project_page %}
+        <p>This project is maintained by <a href="https://thesoftwaredesignlab.github.io/"><img src="{{site.tsdllogo | relative_url}}" alt="{{ site.github.owner_name }}" srcset="" style="width: 200px; padding-top: 5px;"></a></p>
+        {% endif %}
+        <!-- <p>
+          <small>
+            <strong>MutAPK is being partially supported by a Google Latin America Research Award (LARA) 2018-2020</strong>
+          </small>
+        </p> -->
+      </footer>
+    </div>
+    <!-- <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
     crossorigin="anonymous"></script>
     <script src="assets/js/popper.min.js"></script>
     <script src="assets/js/bootstrap.min.js"></script> -->
-  <script src="{{ " /assets/js/scale.fix.js" | relative_url }}"></script>
-  {% if site.google_analytics %}
-  <script>
-    (function (i, s, o, g, r, a, m) {
-      i['GoogleAnalyticsObject'] = r; i[r] = i[r] || function () {
-        (i[r].q = i[r].q || []).push(arguments)
-      }, i[r].l = 1 * new Date(); a = s.createElement(o),
-        m = s.getElementsByTagName(o)[0]; a.async = 1; a.src = g; m.parentNode.insertBefore(a, m)
-    })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
-    ga('create', '{{ site.google_analytics }}', 'auto');
-    ga('send', 'pageview');
-  </script>
-  {% endif %}
-</body>
-
+    <script src="{{ "/assets/js/scale.fix.js" | relative_url }}"></script>
+    {% if site.google_analytics %}
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+      ga('create', '{{ site.google_analytics }}', 'auto');
+      ga('send', 'pageview');
+    </script>
+    {% endif %}
+  </body>
 </html>
