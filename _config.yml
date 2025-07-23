@@ -1,0 +1,9 @@
+theme: jekyll-theme-minimal
+show_downloads: ["true"]
+logo: /assets/imgs/eyenav-logo.png
+title: EyeNav
+tsdllogo: /assets/imgs/horizontalLightBrackgrounds.png
+
+navigation:
+  - title: Video
+    link: /video.hmtl
