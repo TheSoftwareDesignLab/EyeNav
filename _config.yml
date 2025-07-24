@@ -5,5 +5,23 @@ title: EyeNav
 tsdllogo: /assets/imgs/horizontalLightBrackgrounds.png
 
 navigation:
+  - title: Purpose
+    link: /purpose.html
   - title: Video
-    link: /video.hmtl
+    link: /video.html
+  - title: Publications
+    link: /publications.html
+  - title: Summary
+    link: /summary.html
+  - title: Installation
+    link: /installation.html
+  - title: Usage
+    link: /usage.html
+  - title: Configuration
+    link: /configuration.html
+  - title: Architecture Overview
+    link: /architecture.html
+  - title: Use Cases
+    link: /use-cases.html
+  - title: License
+    link: /license.html
