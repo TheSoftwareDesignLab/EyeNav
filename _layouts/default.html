@@ -28,9 +28,11 @@
         <p style="margin-bottom: 7px">{{ site.description | default: site.github.project_tagline }}</p>
 
         {% if site.show_downloads %}
-        <ul class="downloads" style="margin-bottom: 7px">
-          <li><a href="{{ site.github.repository_url }}">View On <strong>GitHub</strong></a></li>
-        </ul>
+        <a href="{{ site.github.repository_url }}" 
+          style="display: inline-block; padding: 10px 16px; background-color: #24292e; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
+          View on GitHub
+        </a>
+
         {% endif %}
 
         <h3 style="margin-bottom: 7px">Team Members</h3>

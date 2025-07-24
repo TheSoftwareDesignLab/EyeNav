@@ -13,7 +13,7 @@ By orchestrating gaze-driven pointer control, voice-command parsing, and concurr
 # Video
 
 <p align="center">
-<iframe width="560" height="315" src="https://youtu.be/caxh22XqrdI" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/caxh22XqrdI?si=ZeSqMQCshEeBoQOi" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 </p>
 
 ---
@@ -54,6 +54,8 @@ EyeNav implements the following core features:
    cd EyeNav
    ```
 2. **Backend Setup**
+
+   Frtom the `backend/` folder
 
    ```bash
    python3 -m venv venv
