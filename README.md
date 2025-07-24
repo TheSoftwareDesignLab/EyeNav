@@ -30,6 +30,7 @@ By orchestrating gaze-driven pointer control, voice-command parsing, and concurr
 * A microphone
 * Google Chrome (v114+)
 * Python
+
 ---
 
 # Summary
