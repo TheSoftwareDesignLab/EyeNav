@@ -2,9 +2,9 @@
 
 EyeNav is a modular web interaction framework. It fuses real-time eye-tracking (with Tobii-Pro SDK) and on-device natural-language processing (using Vosk) within a Chrome extension and Python backend to deliver:
 
-* **Accessible input** for users with motor impairments
-* **Hands-free browser control** for developers and general users
-* **Automated test generation** via record-and-replay (Gherkin + WebdriverIO)
+* Accessible input for users with motor impairments
+* Hands-free browser control for developers and general users
+* Automated test generation via record-and-replay (Gherkin + WebdriverIO)
 
 By orchestrating gaze-driven pointer control, voice-command parsing, and concurrent logging threads, EyeNav enables both interactive accessibility and behavior-driven development in web environments.
 
@@ -37,11 +37,16 @@ By orchestrating gaze-driven pointer control, voice-command parsing, and concurr
 
 EyeNav implements the following core features:
 
-* **Gaze-Driven Pointer Control**: Maps eye gaze to cursor movements using the Tobii Pro Nano and the `tobii-research` SDK.
-* **NLP Command Parsing**: Transcribes and interprets voice commands (click, input, scroll, navigate) with Vosk running locally.
-* **Record-and-Replay Test Generation**: Logs interactions in Gherkin syntax and replays them via Kraken & WebdriverIO.
-* **Modularity**: Enable or disable any of the three subsystems (gaze, voice, test logger) independently.
-* **Internationalization**: Supports English and Spanish out of the box; additional languages via voice-model download and locale translation.
+* Gaze-Driven Pointer Control. 
+   > Maps eye gaze to cursor movements using the Tobii Pro Nano and the `tobii-research` SDK.
+* NLP Command Parsing
+   > Transcribes and interprets voice commands (click, input, scroll, navigate) with Vosk running locally.
+* Record-and-Replay Test Generation.
+   > Logs interactions in Gherkin syntax and replays them via Kraken & WebdriverIO.
+* Modularity 
+   > Enable or disable any of the three subsystems (gaze, voice, test logger) independently.
+* Internationalization
+   > Supports English and Spanish out of the box; additional languages can be downloaded and locale translation.
 
 ---
 
@@ -120,13 +125,12 @@ EyeNav implements the following core features:
 
 ![Components Diagram](assets/imgs/components-diagram.jpg)
 
-* **Frontend (Chrome Extension)**: UI panel + event listener + WebSocket client
-* **Backend Service**: HTTP API + thread dispatcher spawning:
-
+* Frontend (Chrome Extension): UI panel + event listener + WebSocket client
+* Backend Service: HTTP API + thread dispatcher spawning:
   * Eye-Tracking Thread (Tobii SDK)
   * Voice Thread (Vosk)
   * Logging Thread (Gherkin generator)
-* **Test Runner**: Kraken/WebdriverIO integration for replay
+* Test Runner: Kraken/WebdriverIO integration for replay
 
 ## Context
 
@@ -136,9 +140,13 @@ EyeNav implements the following core features:
 
 # Use Cases
 
-1. **Accessible Browsing**: Hands-free navigation for users with disabilities.
-2. **Automated Testing (A-TDD)**: Generate and replay acceptance tests for regression.
-3. **Accessibility Evaluation**: Collect interaction data for consultants and researchers.
-4. **Intelligent Agents**: [TBD] Enable bots to navigate and test web UIs via gaze & speech.
+1. Accessible Browsing
+   > Hands-free navigation for users with disabilities.
+2. Automated Testing (A-TDD)
+   > Generate and replay acceptance tests for regression.
+3. Accessibility Evaluation
+   > Collect interaction data for consultants and researchers.
+4. Intelligent Agents
+   > [TBD] Enable bots to navigate and test web UIs via gaze & speech.
 
 
