@@ -50,7 +50,7 @@ EyeNav implements the following core features:
 1. **Clone the Repository**
 
    ```bash
-   git clone https://github.com/your-org/EyeNav.git
+   git clone https://github.com/TheSoftwareDesignLab/EyeNav.git
    cd EyeNav
    ```
 2. **Backend Setup**
