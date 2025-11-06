@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@wdio/globals": "^9.17.0",
     "kraken-node": "^1.0.24"
   }
 }

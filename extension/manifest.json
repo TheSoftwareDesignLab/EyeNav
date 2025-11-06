@@ -13,7 +13,9 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "EyeNav"
+    "default_title": "EyeNav",
+    
+    "default_popup": "popup/popup.html"
   },
   "side_panel": {
     "default_path": "sidepanel/sidepanel.html"

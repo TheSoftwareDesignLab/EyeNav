@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EyeNav - K&M Mode</title>
+    <link rel="stylesheet" href="popup.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <img src="../sidepanel/assets/logo-light.png" alt="Accessibility Icon" />
+            </div>
+            <h1 id="eyenav-title-popup"></h1>
+            <div style="margin: 0.45cm;"></div>
+        </div>
+
+        <main>
+            <div class="file-path-container">
+                <label for="file-path-input">Ruta del Archivo (Opcional):</label>
+                <input type="text" id="file-path-input" placeholder="Ej: C:\pruebas\mi_test.feature">
+            </div>
+            <div class="start-session">
+                <button id="play-button" class="play-button play" aria-label="Start session">
+                    <span aria-hidden="true">&#9658;</span>
+                </button>
+                <p id="alert-below-button" style="color: red;"></p>
+            </div>
+
+            <hr class="separator">
+            <div class="side-panel-link-container">
+                <a href="#" id="open-side-panel" data-i18n-key="open-side-panel-link">Abrir Modo Ocular y Voz</a>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

@@ -2,6 +2,7 @@
 
 backend/test_sessions/
 backend/transcriptions/
+backend/env/
 
 backend/rosetta-env/
 experiments/
