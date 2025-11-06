@@ -8,19 +8,22 @@ global_gaze_data = None
 previous_position = None
 is_tracking = False
 my_eyetracker = None
-gaze_buffer = deque(maxlen=5)  
+gaze_buffer = deque(maxlen=5) 
 threshold_distance = 30
+
+
+current_gaze_position = (0, 0)
 
 def gaze_data_callback(gaze_data):
     global global_gaze_data
     global_gaze_data = gaze_data
 
 def subscribe_to_gaze_data(eyetracker):
-    print("INFO: Subscribing to gaze data for eye tracker with serial number {0}.".format(eyetracker.serial_number))
+    print("INFO: Subscribing to gaze data for eye tracker...")
     eyetracker.subscribe_to(tr.EYETRACKER_GAZE_DATA, gaze_data_callback, as_dictionary=True)
 
 def unsubscribe_from_gaze_data(eyetracker):
-    print("INFO: Unsubscribing from gaze data for eye tracker with serial number {0}.".format(eyetracker.serial_number))
+    print("INFO: Unsubscribing from gaze data for eye tracker...")
     eyetracker.unsubscribe_from(tr.EYETRACKER_GAZE_DATA, gaze_data_callback)
 
 def smooth_move_to(x, y, previous_x, previous_y, smoothing=0.5):
@@ -30,14 +33,13 @@ def smooth_move_to(x, y, previous_x, previous_y, smoothing=0.5):
     return target_x, target_y
 
 def distance(point1, point2):
-    """Helper function to calculate the distance between two points."""
     return math.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
 
 def track_gaze():
-    global previous_position, is_tracking, my_eyetracker, gaze_buffer
+    global previous_position, is_tracking, my_eyetracker, gaze_buffer, current_gaze_position
 
     found_eyetrackers = tr.find_all_eyetrackers()
-    if len(found_eyetrackers) == 0:
+    if not found_eyetrackers:
         print("INFO: No eye trackers found.")
         return
 
@@ -58,6 +60,9 @@ def track_gaze():
                     avg_x = sum([g[0] for g in gaze_buffer]) / gaze_buffer.maxlen
                     avg_y = sum([g[1] for g in gaze_buffer]) / gaze_buffer.maxlen
 
+                 
+                    current_gaze_position = (avg_x, avg_y)
+
                     if previous_position is None:
                         previous_position = (avg_x, avg_y)
 
@@ -77,3 +82,8 @@ def start_eye_tracking():
 def stop_eye_tracking():
     global is_tracking
     is_tracking = False
+
+
+def get_current_gaze_position():
+  
+    return current_gaze_position

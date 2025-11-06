@@ -50,6 +50,54 @@ h1 {
     color: #333;
 }
 
+
+
+.popup-link-container {
+    text-align: center;
+    margin: 15px 0; 
+}
+
+.popup-link-container a {
+    font-size: 13px;
+    color: #007bff; 
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.popup-link-container a:hover {
+    text-decoration: underline;
+}
+
+.separator {
+    border: none;
+    height: 1px;
+    background-color: #eee; 
+    margin: 15px 0;
+}
+
+
+
+.file-path-container {
+    margin-top: 20px;
+}
+
+.file-path-container label {
+    display: block;
+    font-size: 13px;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.file-path-container input[type="text"] {
+    width: 100%;
+    padding: 8px;
+    font-size: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+
+
 .start-session {
     text-align: center;
     margin: 20px 0;

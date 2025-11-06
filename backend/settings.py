@@ -1,14 +1,11 @@
 import os
-import time
 
-TEST_DIRECTORY = "test_sessions"
-TRANSCRIPTION_DIR = "transcriptions"
 
-if not os.path.exists(TEST_DIRECTORY):
-    os.makedirs(TEST_DIRECTORY)
+desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
 
-if not os.path.exists(TRANSCRIPTION_DIR):
-    os.makedirs(TRANSCRIPTION_DIR)
+project_path = os.path.join(desktop_path, 'data', 'EyeNav2')
 
-test_file = None 
+OUTPUT_DIR = os.path.join(project_path, 'testing')
+
+test_file = None
 transcription_file = None

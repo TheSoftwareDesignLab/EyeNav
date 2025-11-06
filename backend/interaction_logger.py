@@ -1,63 +1,95 @@
 import queue
 import time
 import settings
+import os
 
 interaction_queue = queue.Queue()
 
+def get_selector_keyword(selector):
+
+    if selector and (selector.startswith('/') or selector.startswith('(')):
+        return 'xpath'
+   
+    return 'xpath' 
+
 def get_test_file():
+
+    if not settings.test_file:
+        return None
+    
+    test_dir = os.path.dirname(settings.test_file)
+    os.makedirs(test_dir, exist_ok=True)
+    
     return settings.test_file
 
 def log_interaction(interaction):
-    """
-    Logs an interaction to the test file.
-    @param interaction: The string representing the interaction (click or voice command)
-    @param test_file: The path to the test file where interactions are logged
-    """
+ 
     text = define_interaction(interaction)
     test_file = get_test_file()
     
     if test_file and text:
-        with open(test_file, "a") as f:
-            f.write(f"{text}\n")
+        try:
+            with open(test_file, "a", encoding="utf-8") as f:
+                f.write(f"{text}\n")
+        except Exception as e:
+            print(f"ERROR: Could not write interaction to {test_file}: {e}")
 
 def define_interaction(interaction):
-    """
-    Makes a string representation of the interaction
-    @param interaction: The interaction dictionary
-    @return: The string representation of the interaction
-    """
-    
+
     text = None
-    if interaction["type"] == "click":
-        if interaction["href"]:
-            text = f'\tAnd I click on tag with href "{interaction["href"]}"'
-        elif interaction["id"]:
-            text = f'\tAnd I click on tag with id "{interaction["id"]}"'
-        else:
-            text = f'\tAnd I click on tag with xpath "{interaction["xpath"]}"'
-    elif interaction["type"] == "input":
-        text = f'\tAnd I input "{interaction["text"]}"'
-    elif interaction["type"] == "enter":
-        text = f'\tAnd I hit enter'
-    elif interaction["type"] == "back":
-        text = f'\tAnd I go back'
-    elif interaction["type"] == "forward":
-        text = f'\tAnd I go forward'
-    elif interaction["type"] == "go":
-        if interaction["direction"] > 0:
-            text = f'\tAnd I scroll down'
-        else:
-            text = f'\tAnd I scroll up'
+    interaction_type = interaction.get("type")
+    selector = interaction.get("xpath") 
     
+ 
+    ignored_types = ["initialState", "zoomChange", "go"]
+    if interaction_type in ignored_types:
+        return None
+  
+
+    if interaction_type == "click" and selector:
+        keyword = get_selector_keyword(selector)
+        text = f'\tAnd I click on element with {keyword} "{selector}"'
+            
+    elif interaction_type == "input" and selector:
+        value = interaction.get("value", "")
+        keyword = get_selector_keyword(selector)
+        text = f'\tAnd I type "{value}" into field with {keyword} "{selector}"'
+            
+    elif interaction_type == "keypress" and interaction.get("key") == "Enter" and selector:
+        keyword = get_selector_keyword(selector)
+        text = f'\tAnd I press the "Enter" key on element with {keyword} "{selector}"'
+            
+    elif interaction_type == "back":
+        text = f'\tAnd I go back'
+        
+    elif interaction_type == "forward":
+        text = f'\tAnd I go forward'
+
+   
+    elif interaction_type == "viewportChange":
+        viewport_data = interaction.get("viewport")
+        if viewport_data:
+            width = viewport_data.get("width")
+            height = viewport_data.get("height")
+            if width is not None and height is not None:
+                text = f'\tAnd I set the viewport to {width}x{height}'
+            else:
+                print("WARNING: viewportChange action missing width or height.")
+        else:
+            print("WARNING: viewportChange action missing viewport data.")
+
+    elif interaction_type: 
+       print(f"WARNING: Unhandled interaction type: {interaction_type}")
+
     return text
     
-
 def main():
     while True:
         try:
-            interaction = interaction_queue.get()
-            print(f"INFO: Logging interaction {interaction}")
+            interaction = interaction_queue.get(timeout=1) 
+            print(f"INFO: Received interaction {interaction.get('type')}")
             log_interaction(interaction)
+        except queue.Empty:
+            continue
         except Exception as e:
-            print(f"INFO: Error logging interaction: {e}")
-        time.sleep(1)
+            print(f"ERROR: Error in logger loop: {e}")

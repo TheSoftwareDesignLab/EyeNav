@@ -1,145 +1,282 @@
 /**
- * Check if an element is clickable
- * @param {HTMLElement} element
- * @returns {boolean}
- */
-function isClickable(element) {
-    return element.tagName.toLowerCase() === 'a' ||
-        element.tagName.toLowerCase() === 'button' ||
-        element.tagName.toLowerCase() === 'input' ||
-        element.tagName.toLowerCase() === 'select' ||
-        element.tagName.toLowerCase() === 'textarea' ||
-        (element.onclick || element.getAttribute('role') === 'button') ||
-        (element.href !== undefined && element.href !== '');
-}
+ * @fileoverview 
+ * */
 
-/**
- * Get the full XPath of an element
- * @param {HTMLElement} element
- * @returns {string}
- */
-function getXPath(element) {
-    if (element.id) return `//*[@id="${element.id}"]`;
-    if (element === document.body) return '/html/body';
+let currentMode = 'eye-voice'; 
+let isRecording = false;     
 
-    let parts = [];
-    while (element && element.nodeType === Node.ELEMENT_NODE) {
-        let ix = 0;
-        let siblings = element.parentNode ? Array.from(element.parentNode.childNodes) : [];
-        for (let i = 0; i < siblings.length; i++) {
-            const sibling = siblings[i];
-            if (sibling === element) {
-                parts.unshift(`${element.tagName.toLowerCase()}[${ix + 1}]`);
-                break;
-            }
-            if (sibling.nodeType === 1 && sibling.tagName === element.tagName) ix++;
+let lastEditedInput = {
+    element: null,
+    value: ''
+};
+
+let resizeTimeout; 
+const DEBOUNCE_DELAY = 500; 
+
+
+let lastViewportWidth = window.innerWidth;
+let lastViewportHeight = window.innerHeight;
+
+
+
+
+
+function getSelector(element) {
+    if (!element || !element.parentElement) {
+        if (element && element.tagName && element.tagName.toLowerCase() === 'html') {
+            return '/html';
         }
-        element = element.parentNode;
+        return '';
     }
-    return parts.length ? '/' + parts.join('/') : null;
+    
+    if (element.tagName.toLowerCase() === 'html') {
+        return '/html';
+    }
+
+    let path = getSelector(element.parentElement) + '/' + element.tagName.toLowerCase();
+    
+    const siblings = Array.from(element.parentNode.children);
+    const sameTagSiblings = siblings.filter(sibling => sibling.tagName === element.tagName);
+
+    if (sameTagSiblings.length > 1) {
+        const index = sameTagSiblings.indexOf(element) + 1;
+        path += `[${index}]`;
+    }
+    
+    return path;
 }
 
-/**
- * Check if an element is relevant
- * @param {HTMLElement} element
- * @returns {boolean}
- */
-function isRelevantElement(element) {
-    return element.offsetWidth > 0 &&
-        element.offsetHeight > 0 &&
-        ['a', 'button', 'input', 'select', 'textarea', 'div', 'span'].includes(element.tagName.toLowerCase()) ||
-        (element.onclick || element.getAttribute('role') === 'button' || element.hasAttribute('tabindex')) ||
-        (element.href !== undefined && element.href !== '');
+function getInteractiveTarget(element) {
+    if (!element) return element;
+    
+    const tagName = element.tagName.toLowerCase();
+    if (['svg', 'path', 'span', 'i'].includes(tagName)) { 
+        const interactiveParent = element.closest('button, a, [role="button"], [role="link"], input[type="button"], input[type="submit"]');
+        if (interactiveParent) {
+            console.log("EYENAV: Click on decorative/child element detected. Targeting parent:", interactiveParent);
+            return interactiveParent;
+        }
+    }
+    return element;
 }
 
-/**
- * Handle the click event
- * @param {MouseEvent} event
- */
-function handleClick(event) {
-    if (event.isEyeNavHandled) return;  // Prevent duplicate execution
-    event.isEyeNavHandled = true;  // Mark event as handled by EyeNav
 
-    const element = event.target;
+function sendActionToBackend(actionData) {
+    if (!isRecording) return;
 
-    const tagData = {
-        tagName: element.tagName.toLowerCase(),
-        href: element.getAttribute('href') || null,
-        id: element.id || null,
-        className: element.className || null,
-        xpath: getXPath(element),
-        textContent: element.textContent.trim() || null
-    };
-
-    console.log('Clicked, sending tag info:', tagData);
-
-    fetch('http://localhost:5001/tag-info', {
+    console.log('EYENAV: Recording action:', actionData);
+    fetch('http://localhost:5001/record-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tagData),
+        body: JSON.stringify(actionData),
     })
-        .then(response => response.json())
-        .then(data => console.log('Tag info received:', data))
-        .catch(error => console.error('Error:', error));
+    .then(response => response.json())
+    .then(data => console.log('EYENAV: Action recorded:', data))
+    .catch(error => console.error('EYENAV: Error recording action:', error));
 }
 
-/**
- * Mutation callback function for webpages that are dynamically updated.
- * This will attach click handlers to new elements that are added to the DOM.
- * @param {MutationRecord[]} mutations
- */
-function mutationCallback(mutations) {
-    mutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
-            if (node.nodeType === 1 && isRelevantElement(node)) {
-                node.addEventListener('click', handleClick, true); // Attach our event handler in capture phase
-                
-                // Attach to relevant child elements as well
-                node.querySelectorAll('a, button, input, select, textarea').forEach(child => {
-                    child.addEventListener('click', handleClick, true); // In capture phase
-                });
-            }
+
+function recordPendingInputAction() {
+    if (lastEditedInput.element && lastEditedInput.value) {
+        const selector = getSelector(lastEditedInput.element);
+        sendActionToBackend({
+            type: 'input',
+            xpath: selector,
+            value: lastEditedInput.value,
+            url: window.location.href,
         });
+    }
+    lastEditedInput = { element: null, value: '' };
+}
 
-        if (mutation.type === 'attributes' && mutation.target.nodeType === 1) {
-            const node = mutation.target;
 
-            if (!node.hasAttribute('hidden') && node.style.display !== 'none') {
-                node.addEventListener('click', handleClick, true);  // Capture phase to avoid interfering with bubbling
+function handleGenericClick(event) {
+    if (!isRecording || currentMode !== 'keyboard-mouse') return; 
+    
+    recordPendingInputAction();
+    
+    const interactiveElement = getInteractiveTarget(event.target);
+    const selector = getSelector(interactiveElement);
+    
+    const actionData = {
+        type: 'click',
+        xpath: selector,
+        text: interactiveElement.textContent.trim() || interactiveElement.value || interactiveElement.getAttribute('aria-label') || null, 
+        tagName: interactiveElement.tagName.toLowerCase(),
+        url: window.location.href
+    };
+    sendActionToBackend(actionData);
+}
+
+function handleKeyUp(event) {
+    if (!isRecording || currentMode !== 'keyboard-mouse') return;
+
+    const targetElement = event.target;
+
+    if (['input', 'textarea'].includes(targetElement.tagName.toLowerCase())) {
+        lastEditedInput.element = targetElement;
+        lastEditedInput.value = targetElement.value;
+
+        if (event.key === 'Enter') {
+            recordPendingInputAction();
+            const selector = getSelector(targetElement);
+            const actionData = {
+                type: 'keypress',
+                xpath: selector,
+                key: 'Enter',
+                url: window.location.href
+            };
+            sendActionToBackend(actionData);
+        }
+    }
+}
+
+
+function handleResize() {
+    if (!isRecording) return;
+
+    clearTimeout(resizeTimeout);
+
+    resizeTimeout = setTimeout(() => {
+        const currentWidth = window.innerWidth;
+        const currentHeight = window.innerHeight;
+
+      
+        if (currentWidth !== lastViewportWidth || currentHeight !== lastViewportHeight) {
+            console.log(`EYENAV: Window resize detected. New viewport: ${currentWidth}x${currentHeight}`);
+            
+            sendActionToBackend({
+                type: 'viewportChange', 
+                url: window.location.href,
+                viewport: {
+                    width: currentWidth,
+                    height: currentHeight
+                }
+              
+            });
+
+            
+            lastViewportWidth = currentWidth;
+            lastViewportHeight = currentHeight;
+        }
+        
+        
+        
+    }, DEBOUNCE_DELAY);
+}
+
+
+function setupWebSocketListener() {
+    const socket = new WebSocket('ws://localhost:5002/');
+
+    socket.onmessage = (event) => {
+        try {
+            const message = JSON.parse(event.data);
+            if (message.action === 'click_at_coordinates' && isRecording && currentMode === 'eye-voice') { 
+                const element = document.elementFromPoint(message.x, message.y);
+                if (!element) return;
                 
-                node.querySelectorAll('a, button, input, select, textarea').forEach(child => {
-                    child.addEventListener('click', handleClick, true); // Attach to relevant children in capture phase
-                });
+                const interactiveElement = getInteractiveTarget(element);
+                
+                interactiveElement.click();
+
+                const selector = getSelector(interactiveElement);
+                const actionData = {
+                    type: 'click',
+                    xpath: selector,
+                    text: interactiveElement.textContent.trim() || interactiveElement.value || interactiveElement.getAttribute('aria-label') || null,
+                    tagName: interactiveElement.tagName.toLowerCase(),
+                    url: window.location.href
+                };
+                sendActionToBackend(actionData);
             }
+        } catch (error) {}
+    };
+
+    socket.onclose = () => {
+        if (isRecording) { 
+            console.log('EYENAV: WebSocket connection closed unexpectedly. Retrying in 5s...');
+            setTimeout(setupWebSocketListener, 5000); 
+        } else {
+             console.log('EYENAV: WebSocket connection closed.');
+        }
+    };
+     socket.onerror = (error) => {
+         console.error('EYENAV: WebSocket error:', error);
+     };
+}
+
+
+function sendInitialState() {
+    if (!isRecording) return;
+
+    console.log("EYENAV: Sending initial state (viewport and zoom)...");
+    lastViewportWidth = window.innerWidth;
+    lastViewportHeight = window.innerHeight;
+    
+    sendActionToBackend({ 
+        type: 'initialState', 
+        url: window.location.href,
+        viewport: {
+            width: lastViewportWidth,
+            height: lastViewportHeight
+        },
+        devicePixelRatio: window.devicePixelRatio 
+    });
+}
+
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log("EYENAV: Message received in content script:", request); 
+    if (request.action === 'startSession') {
+        currentMode = request.mode;
+        isRecording = true;
+      
+        console.log(`EYENAV: Recording explicitly started by UI (panel/popup) in mode: ${currentMode}`);
+        
+        
+     
+        sendInitialState(); 
+    } else if (request.action === 'stopSession') {
+        recordPendingInputAction();
+        isRecording = false;
+   
+        console.log('EYENAV: Recording explicitly stopped by UI (panel/popup).');
+       
+    }
+});
+
+function initialize() {
+    console.log('EyeNav content script initializing...');
+    
+    chrome.storage.local.get(['isRecording', 'mode'], function(result) {
+        if (result.isRecording) {
+            isRecording = true;
+            currentMode = result.mode || 'eye-voice'; 
+            console.log(`EYENAV: Resuming recording session from storage in mode: ${currentMode}`);
+        } else {
+            isRecording = false;
+            console.log("EYENAV: No active recording session found in storage.");
+        }
+        
+        document.addEventListener('click', handleGenericClick, true);
+        document.addEventListener('keyup', handleKeyUp, true);
+        document.addEventListener('blur', (event) => {
+            if (isRecording && (['input', 'textarea'].includes(event.target.tagName.toLowerCase()))) { 
+                recordPendingInputAction();
+            }
+        }, true);
+        
+        window.addEventListener('resize', handleResize);
+
+        setupWebSocketListener();
+        console.log('EyeNav content script initialized and listeners attached.');
+        
+        if (isRecording) {
+            
+             sendInitialState();
         }
     });
 }
 
-/**
- * Add event listeners
- */
-function addEventListeners() {
-    document.addEventListener('click', handleClick, true);  // Capture phase
-}
-
-
-/**
- * Main initialization function
- */
-function initialize() {
-    console.log('EyeNav content script initialized');
-    
-    addEventListeners();
-
-    const observer = new MutationObserver(mutationCallback);
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['style', 'class', 'id', 'hidden']
-    });
-}
-
-// Call the main initialization function
 initialize();
-
