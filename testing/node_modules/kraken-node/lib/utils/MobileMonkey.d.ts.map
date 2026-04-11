@@ -1,1 +1,0 @@
-{"version":3,"file":"MobileMonkey.d.ts","sourceRoot":"","sources":["../../src/utils/MobileMonkey.ts"],"names":[],"mappings":"AAEA,qBAAa,YAAY;IACvB,MAAM,EAAE,GAAG,CAAC;gBAEA,MAAM,EAAE,GAAG;IAIjB,mBAAmB,CAAC,cAAc,EAAE,MAAM;IAM1C,mBAAmB;IAYnB,WAAW;IAQX,gBAAgB;CAQvB"}

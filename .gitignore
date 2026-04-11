@@ -3,7 +3,7 @@
 backend/test_sessions/
 backend/transcriptions/
 backend/env/
-
+node_modules/
 backend/rosetta-env/
 experiments/
 

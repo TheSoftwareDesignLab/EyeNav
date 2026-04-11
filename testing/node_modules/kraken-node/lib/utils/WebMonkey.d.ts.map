@@ -1,1 +1,0 @@
-{"version":3,"file":"WebMonkey.d.ts","sourceRoot":"","sources":["../../src/utils/WebMonkey.ts"],"names":[],"mappings":"AAEA,qBAAa,SAAS;IACpB,MAAM,EAAE,GAAG,CAAC;gBAEA,MAAM,EAAE,GAAG;IAIjB,mBAAmB,CAAC,cAAc,EAAE,MAAM;IAM1C,mBAAmB;IAYnB,WAAW;IAUX,gBAAgB;YAWR,gBAAgB;YAQhB,sBAAsB;CAOrC"}

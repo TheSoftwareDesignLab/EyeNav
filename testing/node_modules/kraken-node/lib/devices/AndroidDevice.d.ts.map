@@ -1,1 +1,0 @@
-{"version":3,"file":"AndroidDevice.d.ts","sourceRoot":"","sources":["../../src/devices/AndroidDevice.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,MAAM,EAAE,MAAM,UAAU,CAAC;AAGlC,qBAAa,aAAc,SAAQ,MAAM;gBAC3B,EAAE,EAAE,MAAM,EAAE,KAAK,EAAE,MAAM;IAIrC,UAAU,IAAI;QAAE,MAAM,EAAE,MAAM,CAAC;QAAC,KAAK,EAAE,MAAM,CAAA;KAAE;IAY/C,UAAU,IAAI,MAAM;IAIpB,WAAW,IAAI,MAAM;CAItB"}
