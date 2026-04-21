@@ -1,4 +1,5 @@
 {
+    "eyenav-title-popup": "EyeNav Recorder",
     "eyenav-title": "EyeNav",
     "eyenav-desc": "EyeNav can understand the following words, just say them out loud",
     "eyenav-start-message": "Start an orchestrated session",
@@ -18,5 +19,18 @@
     "sessionStarted": "Session started",
     "failedToStart": "Failed to start session",
     "sessionStopped": "Session stopped",
-    "failedToStop": "Failed to stop session"
+    "failedToStop": "Failed to stop session",
+    "open-side-panel-link": "Open eye and voice panel",
+    "open-popup-link": "Open recorder popup",
+    "eyenav-start-k-m-session": "Start recording session",
+    "advanced-mode-label": "Enable eye tracking and voice mode (advanced)",
+    "advanced-mode-help": "Default mode is keyboard and mouse recording.",
+    "mode-enabled-eye-voice": "Advanced eye and voice mode selected.",
+    "mode-enabled-keyboard-mouse": "Default mode: keyboard and mouse recording.",
+    "eye-voice-unavailable": "Eye and voice mode is unavailable. Install optional backend dependencies first.",
+    "current-mode-label": "Current mode:",
+    "mode-keyboard-mouse": "Keyboard and mouse",
+    "mode-eye-voice": "Eye tracking and voice",
+    "eye-voice-ready": "Eye and voice dependencies detected. Ready to record.",
+    "mode-default-keyboard-mouse": "Default mode for most users."
 }

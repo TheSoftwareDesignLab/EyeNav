@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>EyeNav</title>
-    <link rel="stylesheet" href="sidepanel.css" />
+    <link rel="stylesheet" href="../assets/styles.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
@@ -15,21 +15,13 @@
     <div class="container">
         <div class="header">
             <div class="logo">
-                <img src="assets/logo-light.png" alt="Accessibility Icon" />
+                <img src="../assets/logo-light.png" alt="Accessibility Icon" />
             </div>
             <h1 id="eyenav-title"></h1>
             <div style="margin: 0.45cm;"></div>
         </div>
 
         <main>
-            <div class="popup-link-container">
-                <a href="#" id="open-popup-link" data-i18n-key="open-popup-link">Cambiar a Modo Teclado y Ratón</a>
-            </div>
-            <hr class="separator">
-            <div class="file-path-container">
-                <label for="file-path-input">Ruta del Archivo (Opcional):</label>
-                <input type="text" id="file-path-input" placeholder="Ej: C:\pruebas\mi_test.feature">
-            </div>
             <div class="start-session">
                 <button id="play-button" class="play-button play" aria-label="Start session">
                     <span aria-hidden="true">&#9658;</span>
@@ -49,28 +41,28 @@
 
                 <table>
                     <tr>
-                        <td><img src="assets/click.svg" width="30" alt="Click Icon" /></td>
+                        <td><img src="../assets/click.svg" width="30" alt="Click Icon" /></td>
                         <td>
                             <h2 id="eyenav-click-title"></h2>
                             <p id="eyenav-click-desc"></p>
                         </td>
                     </tr>
                     <tr>
-                        <td><img src="assets/input.svg" width="30" alt="Input Icon" /></td>
+                        <td><img src="../assets/input.svg" width="30" alt="Input Icon" /></td>
                         <td>
                             <h2 id="eyenav-input-title"></h2>
                             <p id="eyenav-input-desc"></p>
                         </td>
                     </tr>
                     <tr>
-                        <td><img src="assets/move.svg" width="30" alt="Go Icon" /></td>
+                        <td><img src="../assets/move.svg" width="30" alt="Go Icon" /></td>
                         <td>
                             <h2 id="eyenav-go-title"></h2>
                             <p id="eyenav-go-desc"></p>
                         </td>
                     </tr>
                     <tr>
-                        <td><img src="assets/arrow-back.svg" width="30" alt="Back Icon" /></td>
+                        <td><img src="../assets/arrow-back.svg" width="30" alt="Back Icon" /></td>
                         <td>
                             <h2 id="eyenav-back-title"></h2>
                             <p id="eyenav-back-desc"></p>
@@ -78,7 +70,7 @@
                     </tr>
                     <tr>
                         <td>
-                            <img src="assets/arrow-back.svg" width="30" alt="Forward Icon"
+                            <img src="../assets/arrow-back.svg" width="30" alt="Forward Icon"
                                 style="transform: scaleX(-1);" />
                         </td>
                         <td>
@@ -92,12 +84,12 @@
     </div>
 
     <script src="sidepanel.js"></script>
-    <script>
+    <!-- <script>
         document.addEventListener('DOMContentLoaded', () => {
             const playButton = document.getElementById('play-button');
             playButton.focus();
         });
-    </script>
+    </script> -->
 </body>
 
 </html>

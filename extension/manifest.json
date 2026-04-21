@@ -14,11 +14,10 @@
   },
   "action": {
     "default_title": "EyeNav",
-    
-    "default_popup": "popup/popup.html"
+    "default_popup": "display/popup/popup.html"
   },
   "side_panel": {
-    "default_path": "sidepanel/sidepanel.html"
+    "default_path": "display/sidepanel/sidepanel.html"
   },
   "content_scripts": [
     {

@@ -1,4 +1,5 @@
 {
+    "eyenav-title-popup": "Grabador EyeNav",
     "eyenav-title": "EyeNav",
     "eyenav-desc": "EyeNav puede entender las siguientes palabras, solo di en voz alta",
     "eyenav-start-message": "Iniciar una sesión orquestada",
@@ -18,5 +19,18 @@
     "sessionStarted": "Sesión iniciada",
     "failedToStart": "Error al iniciar sesión",
     "sessionStopped": "Sesión detenida",
-    "failedToStop": "Error al detener la sesión"
+    "failedToStop": "Error al detener la sesión",
+    "open-side-panel-link": "Abrir panel de ojo y voz",
+    "open-popup-link": "Abrir popup de grabación",
+    "eyenav-start-k-m-session": "Iniciar sesión de grabación",
+    "advanced-mode-label": "Habilitar modo de seguimiento ocular y voz (avanzado)",
+    "advanced-mode-help": "El modo predeterminado es grabación por teclado y ratón.",
+    "mode-enabled-eye-voice": "Modo avanzado de ojo y voz seleccionado.",
+    "mode-enabled-keyboard-mouse": "Modo predeterminado: grabación por teclado y ratón.",
+    "eye-voice-unavailable": "El modo ojo y voz no está disponible. Instala primero las dependencias opcionales del backend.",
+    "current-mode-label": "Modo actual:",
+    "mode-keyboard-mouse": "Teclado y ratón",
+    "mode-eye-voice": "Seguimiento ocular y voz",
+    "eye-voice-ready": "Dependencias de ojo y voz detectadas. Listo para grabar.",
+    "mode-default-keyboard-mouse": "Modo predeterminado para la mayoría de usuarios."
 }

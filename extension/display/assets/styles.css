@@ -68,34 +68,31 @@ h1 {
     text-decoration: underline;
 }
 
+.mode-status-card {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #e6e6e6;
+    border-radius: 6px;
+    background: #fafafa;
+}
+
+.mode-status-line {
+    font-size: 12px;
+    color: #222;
+}
+
+.mode-status-hint {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #555;
+}
+
 .separator {
     border: none;
     height: 1px;
     background-color: #eee; 
     margin: 15px 0;
 }
-
-
-
-.file-path-container {
-    margin-top: 20px;
-}
-
-.file-path-container label {
-    display: block;
-    font-size: 13px;
-    color: #333;
-    margin-bottom: 8px;
-}
-
-.file-path-container input[type="text"] {
-    width: 100%;
-    padding: 8px;
-    font-size: 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
 
 
 .start-session {
@@ -218,6 +215,52 @@ h2 {
     font-size: 12px;
     color: #666;
     margin: 0;
+}
+
+.play-button:focus {
+  outline: 3px solid yellow;
+  outline-offset: 3px;
+}
+
+
+.mode-help-text {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #555;
+}
+
+
+
+.start-session {
+    text-align: center;
+    margin: 20px 0;
+}
+
+.play-button {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: gray; 
+    color: white;
+    border: none;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    display: flex;
+    
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.play-button:active {
+    transform: scale(0.95);
+}
+
+.start-session p { 
+    margin-top: 10px;
+    color: #666;
+    font-size: 12px; 
 }
 
 .play-button:focus {
