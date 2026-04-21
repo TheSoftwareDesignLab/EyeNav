@@ -2,40 +2,64 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from websocket_server import start_websocket_server
 import threading
-import eye_tracking
-import voice_control
 import interaction_logger
 import time
 import os
 import settings
+import mode_runtime
 
 app = Flask(__name__)
 CORS(app)
 
-
-tracking_thread = None
-voice_thread = None
 logging_thread = None
-
 is_tracking = False
 start_time = None
 current_mode = None
 initial_state_written = False 
+runtime_state = None
 
 @app.route('/status', methods=['GET'])
 def status():
-    return jsonify({"status": "Server is running"}), 200
+    return jsonify(
+        {
+            "status": "Server is running",
+            "isRecording": is_tracking,
+            "mode": current_mode,
+            "defaultMode": mode_runtime.DEFAULT_MODE,
+            "capabilities": mode_runtime.get_capabilities(),
+        }
+    ), 200
 
 @app.route('/start', methods=['POST'])
 def start_tracking():
-    global tracking_thread, voice_thread, logging_thread, is_tracking, start_time, current_mode, initial_state_written
+    global logging_thread, is_tracking, start_time, current_mode, initial_state_written, runtime_state
+
+    if is_tracking:
+        return jsonify({"status": "A session is already running"}), 400
+
     start_time = time.strftime('%Y-%m-%d_%H-%M-%S')
 
-    data = request.get_json()
-    language = request.headers.get('Language', 'en')
+    data = request.get_json() or {}
+    language = request.headers.get('Language', 'en-us')
     page_name = data.get('pageName')
     page_url = data.get('pageUrl')
-    current_mode = data.get('mode', 'eye-voice')
+    requested_mode = data.get('mode', mode_runtime.DEFAULT_MODE)
+    current_mode = mode_runtime.normalize_mode(requested_mode)
+
+    capabilities = mode_runtime.get_capabilities()
+    mode_capability = capabilities.get(current_mode, {"available": False, "reason": "Unsupported mode"})
+    if not mode_capability.get("available"):
+        return (
+            jsonify(
+                {
+                    "status": "Failed to start selected mode",
+                    "mode": current_mode,
+                    "error": mode_capability.get("reason") or "Selected mode is unavailable",
+                    "capabilities": capabilities,
+                }
+            ),
+            400,
+        )
     
     custom_path = data.get('filePath')
     filename = f"test_session_{start_time}.feature"
@@ -54,40 +78,48 @@ def start_tracking():
     transcription_filename = f"transcription_{start_time}.txt"
     settings.transcription_file = os.path.join(output_dir, transcription_filename)
     
-    if tracking_thread is None or not tracking_thread.is_alive():
-        is_tracking = True
-        initial_state_written = False 
+    is_tracking = True
+    initial_state_written = False 
 
-        os.makedirs(os.path.dirname(settings.test_file), exist_ok=True)
+    os.makedirs(os.path.dirname(settings.test_file), exist_ok=True)
 
         
-        with open(settings.test_file, "w", encoding="utf-8") as f:
-            f.write(f"Feature: Replay of session on {time.strftime('%b %d at %I:%M:%S %p')}\n\n")
-            f.write("@user1 @web\n")
-            f.write(f'Scenario: User interacts with the web page named "{page_name}"\n\n')
-            f.write(f'\tGiven I navigate to page "{page_url}"\n')
+    with open(settings.test_file, "w", encoding="utf-8") as f:
+        f.write(f"Feature: Replay of session on {time.strftime('%b %d at %I:%M:%S %p')}\n\n")
+        f.write("@user1 @web\n")
+        f.write(f'Scenario: User interacts with the web page named "{page_name}"\n\n')
+        f.write(f'\tGiven I navigate to page "{page_url}"\n')
 
-        if current_mode == 'eye-voice':
-            tracking_thread = threading.Thread(target=eye_tracking.start_eye_tracking)
-            tracking_thread.start()
-            voice_thread = threading.Thread(target=voice_control.main, args=(language,))
-            voice_thread.start()
-        
+    if logging_thread is None or not logging_thread.is_alive():
         logging_thread = threading.Thread(target=interaction_logger.main, daemon=True)
         logging_thread.start()
 
-        return jsonify({"status": f"Session started in {current_mode} mode"}), 200
-    else:
-        return jsonify({"status": f"A session is already running"}), 400
+    mode_start = mode_runtime.start_mode(current_mode, language)
+    if not mode_start.get('success'):
+        is_tracking = False
+        return (
+            jsonify(
+                {
+                    "status": "Failed to start selected mode",
+                    "mode": current_mode,
+                    "error": mode_start.get('message'),
+                    "capabilities": mode_runtime.get_capabilities(),
+                }
+            ),
+            400,
+        )
+    runtime_state = mode_start.get('runtime')
+
+    return jsonify({"status": f"Session started in {current_mode} mode"}), 200
 
 @app.route('/stop', methods=['GET'])
 def stop_tracking():
-    global is_tracking
+    global is_tracking, runtime_state, current_mode
     if is_tracking:
         is_tracking = False
-        if current_mode == 'eye-voice':
-            eye_tracking.stop_eye_tracking()
-            voice_control.stop_voice_control()
+        mode_runtime.stop_mode(runtime_state)
+        runtime_state = None
+        current_mode = None
         return jsonify({"status": "Session stopped"}), 200
     else:
         return jsonify({"status": "A session is not running"}), 400

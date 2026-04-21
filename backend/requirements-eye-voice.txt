@@ -1,0 +1,11 @@
+# Optional dependencies for EyeNav eye-tracking + voice mode.
+# Install this after requirements.txt when users want advanced mode support.
+
+PyAutoGUI==0.9.54
+pyperclip==1.9.0
+sounddevice==0.4.7
+vosk==0.3.45
+
+# Tobii package availability can vary by platform and SDK setup.
+# If pip installation fails, install through the Tobii SDK for your OS.
+tobii-research==2.1.0
