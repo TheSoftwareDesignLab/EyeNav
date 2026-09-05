@@ -1,24 +1,11 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from websocket_server import start_websocket_server, message_queue
-import threading
-import eye_tracking
-import voice_control
+from websocket_server import start_websocket_server
 import interaction_logger
-import time
-import os
-import settings
+import session_manager
 
 app = Flask(__name__)
 CORS(app)
-
-# Threads and global variables
-tracking_thread = None
-voice_thread = None
-logging_thread = None
-
-is_tracking = False
-start_time = None
 
 
 @app.route('/status', methods=['GET'])
@@ -28,52 +15,38 @@ def status():
 
 @app.route('/start', methods=['POST'])
 def start_tracking():
-    global tracking_thread, voice_thread, logging_thread, is_tracking, start_time
-    start_time = time.strftime('%Y-%m-%d_%H-%M-%S')  
-        
-    settings.test_file = os.path.join(settings.TEST_DIRECTORY, f"test_session_{start_time}.feature")
-    settings.transcription_file = os.path.join(settings.TRANSCRIPTION_DIR, f"transcription_{start_time}.log")
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"status": "Request body must be JSON"}), 400
 
-    data = request.get_json()
-    language = request.headers.get('Language', 'en')
     page_name = data.get('pageName')
     page_url = data.get('pageUrl')
+    if not page_name or not page_url:
+        return jsonify({"status": "pageName and pageUrl are required"}), 400
 
-    if tracking_thread is None or not tracking_thread.is_alive():
-        is_tracking = True
-        
-        with open(settings.test_file, "w") as f:
-            f.write(f"Feature: Replay of session on {time.strftime('%b %d at %I:%M:%S %p')}\n\n")
-            f.write("@user1 @web\n")
-            f.write(f'Scenario: User interacts with the web page named "{page_name}"\n\n')
-            f.write(f'\tGiven I navigate to page "{page_url}"\n')
+    language = request.headers.get('Language', 'en')
+    # captureMode isn't sent by the extension yet; default preserves today's
+    # behavior of always starting eye tracking + voice control.
+    capture_mode = data.get('captureMode', 'eye_voice')
 
-        tracking_thread = threading.Thread(target=eye_tracking.start_eye_tracking)
-        tracking_thread.start()
+    try:
+        session_manager.start_session(page_name, page_url, language, capture_mode)
+    except ValueError as error:
+        return jsonify({"status": str(error)}), 400
+    except (session_manager.SessionStartError, NotImplementedError) as error:
+        return jsonify({"status": str(error)}), 400
 
-        voice_thread = threading.Thread(target=voice_control.main, args=(language,))
-        voice_thread.start()
-        
-        logging_thread = threading.Thread(target=interaction_logger.main, daemon=True)
-        logging_thread.start()
-
-        return jsonify({"status": f"Eye tracking and voice control started in {language}"}), 200
-    else:
-        return jsonify({"status": f"Eye tracking is already running in {language}"}), 400
+    return jsonify({"status": f"Eye tracking and voice control started in {language}"}), 200
 
 
 @app.route('/stop', methods=['GET'])
 def stop_tracking():
-    global is_tracking
+    try:
+        session_manager.stop_session()
+    except session_manager.SessionStopError as error:
+        return jsonify({"status": str(error)}), 400
 
-    if is_tracking:
-        is_tracking = False
-        eye_tracking.stop_eye_tracking()
-        voice_control.stop_voice_control() 
-
-        return jsonify({"status": "Eye tracking stopped"}), 200
-    else:
-        return jsonify({"status": "Eye tracking is not running"}), 400
+    return jsonify({"status": "Eye tracking stopped"}), 200
 
 
 @app.route('/tag-info', methods=['POST'])
@@ -82,21 +55,19 @@ def tag_info():
     tag_name = data.get('tagName')
     href = data.get('href')
     element_id = data.get('id')
-    class_name = data.get('className')
     xpath = data.get('xpath')
 
-    if is_tracking:
+    if session_manager.is_session_active():
         interaction_logger.interaction_queue.put({
-            "type": "click", 
-            "selector": tag_name, 
-            "href": href, 
-            "id": element_id, 
+            "type": "click",
+            "selector": tag_name,
+            "href": href,
+            "id": element_id,
             "xpath": xpath})
-    
 
     return jsonify({"status": "Tag information received"}), 200
 
 
 if __name__ == '__main__':
     start_websocket_server()
-    app.run(host='0.0.0.0', port=5001) # flask app
+    app.run(host='0.0.0.0', port=5001)  # flask app
