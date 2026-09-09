@@ -1,15 +1,14 @@
 import pyautogui
 import pyperclip
 import platform
-import settings
 import os
 import queue
 import sounddevice as sd
 import json
-import time  
+import time
 from vosk import Model, KaldiRecognizer
 from websocket_server import message_queue
-import interaction_logger
+import event_bus
 from threading import Lock
 
 # Data structures
@@ -21,6 +20,7 @@ typed_text_buffer = ""
 model_lock = Lock()
 current_language = "en-us"
 language_config = {}
+_transcription_file = None
 
 def load_language_config(language_code):
     global language_config
@@ -45,7 +45,7 @@ def get_current_language():
     return current_language
 
 def get_transcription_file():
-    return settings.transcription_file if settings.transcription_file else transcription_file
+    return _transcription_file
 
 
 def log_transcription(text):
@@ -60,18 +60,18 @@ def log_transcription(text):
 
 def log_interaction(interaction, *args, **kwargs):
     """
-    Logs an interaction to the test file.
-    @param interaction: The string representing the interaction (input, back or forward)
+    Publishes a voice-driven interaction as a common event.
+    @param interaction: The event type (input, enter, back, forward or go)
     """
-    dictionary = {"type": interaction}
+    data = {}
     if interaction == "input":
-        dictionary["text"] = args[0]
-    
+        data["text"] = args[0]
+
     if interaction == "go":
-        dictionary["direction"] = args[0]
-        dictionary["units"] = args[1]
-    
-    interaction_logger.interaction_queue.put(dictionary)
+        data["direction"] = args[0]
+        data["units"] = args[1]
+
+    event_bus.publish("voice", interaction, data)
 
 
 
@@ -224,15 +224,19 @@ def audio_callback(indata, frames, time, status):
     audio_queue.put(bytes(indata))
 
 
-def main(language_code="en-us"):
+def main(session):
     """
     Main function
+    @param session: the session_recorder.Session this voice control run belongs to
     """
-    set_voice_language(language_code)
-    print(f"INFO: Starting voice control in {language_code}...")
-    
+    global _transcription_file
+    _transcription_file = session.transcription_file
+
+    set_voice_language(session.language)
+    print(f"INFO: Starting voice control in {session.language}...")
+
     global is_voice_recognition_active
-    is_voice_recognition_active = True  
+    is_voice_recognition_active = True
 
     with sd.RawInputStream(samplerate=16000, blocksize=8000, dtype='int16',
                            channels=1, callback=audio_callback):
@@ -240,4 +244,5 @@ def main(language_code="en-us"):
 
 
 if __name__ == "__main__":
-    main()
+    import session_recorder
+    main(session_recorder.create_session("Manual test", "http://localhost", "en-us", "eye_voice"))

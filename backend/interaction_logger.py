@@ -1,63 +1,42 @@
-import queue
-import time
-import settings
+import json
 
-interaction_queue = queue.Queue()
+import event_bus
+import feature_writer
 
-def get_test_file():
-    return settings.test_file
 
-def log_interaction(interaction):
+def log_step(session, event):
     """
-    Logs an interaction to the test file.
-    @param interaction: The string representing the interaction (click or voice command)
-    @param test_file: The path to the test file where interactions are logged
+    Writes the event's Gherkin step (if it has one) to the session's .feature file.
     """
-    text = define_interaction(interaction)
-    test_file = get_test_file()
-    
-    if test_file and text:
-        with open(test_file, "a") as f:
-            f.write(f"{text}\n")
+    step = feature_writer.to_gherkin_step(event)
+    if step and session.test_file:
+        with open(session.test_file, "a") as f:
+            f.write(f"{step}\n")
 
-def define_interaction(interaction):
-    """
-    Makes a string representation of the interaction
-    @param interaction: The interaction dictionary
-    @return: The string representation of the interaction
-    """
-    
-    text = None
-    if interaction["type"] == "click":
-        if interaction["href"]:
-            text = f'\tAnd I click on tag with href "{interaction["href"]}"'
-        elif interaction["id"]:
-            text = f'\tAnd I click on tag with id "{interaction["id"]}"'
-        else:
-            text = f'\tAnd I click on tag with xpath "{interaction["xpath"]}"'
-    elif interaction["type"] == "input":
-        text = f'\tAnd I input "{interaction["text"]}"'
-    elif interaction["type"] == "enter":
-        text = f'\tAnd I hit enter'
-    elif interaction["type"] == "back":
-        text = f'\tAnd I go back'
-    elif interaction["type"] == "forward":
-        text = f'\tAnd I go forward'
-    elif interaction["type"] == "go":
-        if interaction["direction"] > 0:
-            text = f'\tAnd I scroll down'
-        else:
-            text = f'\tAnd I scroll up'
-    
-    return text
-    
 
-def main():
+def log_event(session, event):
+    """
+    Appends the full event, as JSON, to the session's detailed events file.
+    """
+    if session.events_file:
+        with open(session.events_file, "a") as f:
+            f.write(json.dumps(event.to_dict()) + "\n")
+
+
+def main(session):
+    """
+    Consumes events from the event bus and logs them for the given session,
+    until event_bus.stop() unblocks it so the thread can exit cleanly.
+    @param session: the session_recorder.Session these events belong to
+    """
     while True:
+        event = event_bus.consume()
+        if event_bus.is_stop_signal(event):
+            break
+
         try:
-            interaction = interaction_queue.get()
-            print(f"INFO: Logging interaction {interaction}")
-            log_interaction(interaction)
+            print(f"INFO: Logging event {event}")
+            log_event(session, event)
+            log_step(session, event)
         except Exception as e:
-            print(f"INFO: Error logging interaction: {e}")
-        time.sleep(1)
+            print(f"INFO: Error logging event: {e}")

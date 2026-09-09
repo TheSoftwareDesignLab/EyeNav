@@ -3,6 +3,7 @@ import eye_tracking
 import voice_control
 import interaction_logger
 import session_recorder
+import event_bus
 
 ALLOWED_CAPTURE_MODES = {"eye_voice", "mouse_keyboard", "all"}
 
@@ -23,7 +24,7 @@ CAPTURERS = {
         "stop": eye_tracking.stop_eye_tracking,
     },
     "voice_control": {
-        "start": lambda session: threading.Thread(target=voice_control.main, args=(session.language,)),
+        "start": lambda session: threading.Thread(target=voice_control.main, args=(session,)),
         "stop": voice_control.stop_voice_control,
     },
 }
@@ -82,7 +83,7 @@ def start_session(page_name, page_url, language, capture_mode):
             thread.start()
             started_threads[name] = thread
 
-        logging_thread = threading.Thread(target=interaction_logger.main, daemon=True)
+        logging_thread = threading.Thread(target=interaction_logger.main, args=(session,), daemon=True)
         logging_thread.start()
         started_threads["interaction_logger"] = logging_thread
 
@@ -114,9 +115,17 @@ def stop_session():
         raise SessionStopError("No session is currently running")
 
     for name in _active_threads:
+        if name == "interaction_logger":
+            continue
         stop_fn = CAPTURERS.get(name, {}).get("stop")
         if stop_fn:
             stop_fn()
+
+    # interaction_logger isn't in CAPTURERS: it always runs regardless of
+    # capture mode, and it's stopped by unblocking its consume() call rather
+    # than an external stop() function, so it gets a clean, joinable shutdown.
+    event_bus.stop()
+    _active_threads["interaction_logger"].join(timeout=5)
 
     stopped_session = _active_session
     stopped_session.state = "stopped"

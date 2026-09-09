@@ -1,7 +1,8 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from websocket_server import start_websocket_server
-import interaction_logger
+import event_bus
+import event_model
 import session_manager
 
 app = Flask(__name__)
@@ -24,7 +25,7 @@ def start_tracking():
     if not page_name or not page_url:
         return jsonify({"status": "pageName and pageUrl are required"}), 400
 
-    language = request.headers.get('Language', 'en')
+    language = request.headers.get('Language', 'en-us')
     # captureMode isn't sent by the extension yet; default preserves today's
     # behavior of always starting eye tracking + voice control.
     capture_mode = data.get('captureMode', 'eye_voice')
@@ -58,12 +59,14 @@ def tag_info():
     xpath = data.get('xpath')
 
     if session_manager.is_session_active():
-        interaction_logger.interaction_queue.put({
-            "type": "click",
-            "selector": tag_name,
-            "href": href,
-            "id": element_id,
-            "xpath": xpath})
+        try:
+            event_bus.publish("browser", "click", {
+                "selector": tag_name,
+                "href": href,
+                "id": element_id,
+                "xpath": xpath})
+        except event_model.InvalidEventError as error:
+            return jsonify({"status": str(error)}), 400
 
     return jsonify({"status": "Tag information received"}), 200
 
