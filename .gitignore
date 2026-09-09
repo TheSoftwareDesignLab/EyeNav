@@ -5,6 +5,7 @@ backend/transcriptions/
 backend/events/
 node_modules/
 backend/rosetta-env/
+backend/venv/
 experiments/
 
 backend/__pycache__/

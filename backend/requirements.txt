@@ -13,7 +13,7 @@ itsdangerous==2.2.0
 Jinja2==3.1.6
 MarkupSafe==3.0.3
 MouseInfo==0.1.3
-numpy @ file:///opt/miniconda3/conda-bld/numpy_and_numpy_base_1761579345363/work/dist/numpy-2.2.5-cp310-cp310-macosx_12_0_arm64.whl#sha256=cee7bef98ac83b78786789b80f44469231df1e3cf12ce327f909aa4ea0fcee88
+numpy==2.2.5
 pillow==12.0.0
 PyAutoGUI==0.9.54
 pycparser==2.23
