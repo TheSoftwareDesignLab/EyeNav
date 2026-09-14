@@ -49,6 +49,10 @@ def is_session_active():
     return _active_session is not None and _active_session.state == "running"
 
 
+def get_active_capture_mode():
+    return _active_session.capture_mode if is_session_active() else None
+
+
 def start_session(page_name, page_url, language, capture_mode):
     """
     Starts a new session: validates the capture mode, creates its files via

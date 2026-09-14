@@ -11,7 +11,11 @@ CORS(app)
 
 @app.route('/status', methods=['GET'])
 def status():
-    return jsonify({"status": "Server is running"}), 200
+    return jsonify({
+        "status": "Server is running",
+        "sessionActive": session_manager.is_session_active(),
+        "captureMode": session_manager.get_active_capture_mode(),
+    }), 200
 
 
 @app.route('/start', methods=['POST'])
@@ -26,8 +30,9 @@ def start_tracking():
         return jsonify({"status": "pageName and pageUrl are required"}), 400
 
     language = request.headers.get('Language', 'en-us')
-    # captureMode isn't sent by the extension yet; default preserves today's
-    # behavior of always starting eye tracking + voice control.
+    # The popup and side panel both send captureMode now; the default only
+    # covers a raw request that omits it. mouse_keyboard/all still 400 until
+    # mouse_capture/keyboard_capture exist (see session_manager.CAPTURERS).
     capture_mode = data.get('captureMode', 'eye_voice')
 
     try:

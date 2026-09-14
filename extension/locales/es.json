@@ -1,5 +1,12 @@
 {
     "eyenav-title": "EyeNav",
+    "eyenav-choose-mode": "¿Cómo quieres interactuar?",
+    "eyenav-mode-eye-voice": "👁️ Ojos + Voz",
+    "eyenav-mode-mouse-keyboard": "🖱️ Mouse + Teclado",
+    "eyenav-eye-voice-active": "Hay una sesión de ojos + voz en curso.",
+    "eyenav-session-active-unknown-mode": "Ya hay una sesión en curso.",
+    "eyenav-open-side-panel": "Abrir panel lateral",
+    "failedToOpenSidePanel": "No se pudo abrir el panel lateral.",
     "eyenav-desc": "EyeNav puede entender las siguientes palabras, solo di en voz alta",
     "eyenav-start-message": "Iniciar una sesión orquestada",
     "eyenav-ensure-server-running": "Asegúrate de que el servidor esté en ejecución",

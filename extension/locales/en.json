@@ -1,5 +1,12 @@
 {
     "eyenav-title": "EyeNav",
+    "eyenav-choose-mode": "How do you want to interact?",
+    "eyenav-mode-eye-voice": "👁️ Eye tracking + Voice",
+    "eyenav-mode-mouse-keyboard": "🖱️ Mouse + Keyboard",
+    "eyenav-eye-voice-active": "An eye tracking + voice session is running.",
+    "eyenav-session-active-unknown-mode": "A session is already running.",
+    "eyenav-open-side-panel": "Open side panel",
+    "failedToOpenSidePanel": "Failed to open the side panel.",
     "eyenav-desc": "EyeNav can understand the following words, just say them out loud",
     "eyenav-start-message": "Start an orchestrated session",
     "eyenav-ensure-server-running": "Ensure the server is running",
