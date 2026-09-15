@@ -1,8 +1,10 @@
 {
     "eyenav-title": "EyeNav",
-    "eyenav-choose-mode": "¿Cómo quieres interactuar?",
-    "eyenav-mode-eye-voice": "👁️ Ojos + Voz",
-    "eyenav-mode-mouse-keyboard": "🖱️ Mouse + Teclado",
+    "eyenav-choose-mode": "¡Hola! ¿Cómo te gustaría interactuar hoy?",
+    "eyenav-mode-eye-voice-title": "Ojos + Voz",
+    "eyenav-mode-eye-voice-subtitle": "Para uso manos libres",
+    "eyenav-mode-mouse-keyboard-title": "Mouse + Teclado",
+    "eyenav-mode-mouse-keyboard-subtitle": "Para navegación precisa",
     "eyenav-eye-voice-active": "Hay una sesión de ojos + voz en curso.",
     "eyenav-session-active-unknown-mode": "Ya hay una sesión en curso.",
     "eyenav-open-side-panel": "Abrir panel lateral",

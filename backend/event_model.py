@@ -21,7 +21,10 @@ class InvalidEventError(ValueError):
 class Event:
     source: str
     type: str
-    data: dict
+    # Excluded from hash: it's a dict (unhashable), and frozen dataclasses
+    # auto-generate __hash__ from every field by default, which would make
+    # hash(event) raise. Still included in __eq__/repr - only hashing skips it.
+    data: dict = field(hash=False)
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     #python dictionary conversion
@@ -53,4 +56,4 @@ def build_event(source, type, data):
     @return: a validated Event
     """
     validate(source, type, data)
-    return Event(source=source, type=type, data=data)
+    return Event(source=source, type=type, data=dict(data))

@@ -51,7 +51,9 @@ function initEyeNavPanel(captureMode, knownStatus) {
         strings = localeData;
         language_config = configData;
         alertBelowButton.innerHTML = strings['eyenav-ensure-server-running'] || "Ensure the server is running";
-        voiceCommand.innerHTML = strings['initial-nlp-command'] || "Recognized voice commands will appear here";
+        if (voiceCommand) {
+            voiceCommand.innerHTML = strings['initial-nlp-command'] || "Recognized voice commands will appear here";
+        }
 
         applyTranslations(strings);
         setupWebSocket();
@@ -248,6 +250,8 @@ function initEyeNavPanel(captureMode, knownStatus) {
 
     function displayNLPCommand(command) {
         console.log('EYENAV: NLP Command:', command);
+        if (!voiceCommand) return; // this surface has no visualization to update (e.g. mouse_keyboard popup)
+
         const commandElement = document.createElement('p');
         commandElement.style.fontSize = '20px';
         commandElement.style.fontWeight = 'bold';

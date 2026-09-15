@@ -12,6 +12,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const chooseModeText = document.getElementById('eyenav-choose-mode');
     const eyeVoiceActiveText = document.getElementById('eyenav-eye-voice-active');
     const modeError = document.getElementById('mode-error');
+    const eyeVoiceTitle = document.getElementById('eyenav-mode-eye-voice-title');
+    const eyeVoiceSubtitle = document.getElementById('eyenav-mode-eye-voice-subtitle');
+    const mouseKeyboardTitle = document.getElementById('eyenav-mode-mouse-keyboard-title');
+    const mouseKeyboardSubtitle = document.getElementById('eyenav-mode-mouse-keyboard-subtitle');
+    const openSidePanelTitle = document.getElementById('eyenav-open-side-panel');
+    const modeChooserTitle = document.getElementById('mode-chooser-title');
+    const eyeVoiceNoticeTitle = document.getElementById('eye-voice-notice-title');
+    const panelContentTitle = document.getElementById('panel-content-title');
 
     let strings = {};
 
@@ -70,10 +78,15 @@ document.addEventListener('DOMContentLoaded', function () {
     // on (chooser, notice, or panel) never briefly renders with blank text.
     Promise.all([localePromise, statusPromise]).then(([localeStrings, status]) => {
         strings = localeStrings;
-        chooseModeText.textContent = strings['eyenav-choose-mode'] || 'How do you want to interact?';
-        eyeVoiceButton.textContent = strings['eyenav-mode-eye-voice'] || 'Eye tracking + Voice';
-        mouseKeyboardButton.textContent = strings['eyenav-mode-mouse-keyboard'] || 'Mouse + Keyboard';
-        openSidePanelButton.textContent = strings['eyenav-open-side-panel'] || 'Open side panel';
+        modeChooserTitle.textContent = strings['eyenav-title'] || 'EyeNav';
+        eyeVoiceNoticeTitle.textContent = strings['eyenav-title'] || 'EyeNav';
+        panelContentTitle.textContent = strings['eyenav-title'] || 'EyeNav';
+        chooseModeText.textContent = strings['eyenav-choose-mode'] || 'Hi! How would you like to interact today?';
+        eyeVoiceTitle.textContent = strings['eyenav-mode-eye-voice-title'] || 'Eye tracking + Voice';
+        eyeVoiceSubtitle.textContent = strings['eyenav-mode-eye-voice-subtitle'] || 'For hands-free use';
+        mouseKeyboardTitle.textContent = strings['eyenav-mode-mouse-keyboard-title'] || 'Mouse + Keyboard';
+        mouseKeyboardSubtitle.textContent = strings['eyenav-mode-mouse-keyboard-subtitle'] || 'For precise navigation';
+        openSidePanelTitle.textContent = strings['eyenav-open-side-panel'] || 'Open side panel';
 
         // If a session is already running, don't show the chooser.
         // mouse_keyboard sessions are driven from here, so reveal the

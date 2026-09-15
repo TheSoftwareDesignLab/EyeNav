@@ -9,6 +9,9 @@
     "scripting",
     "sidePanel"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_title": "EyeNav",
     "default_popup": "popup/popup.html"

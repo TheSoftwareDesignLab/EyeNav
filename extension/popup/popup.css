@@ -19,14 +19,21 @@ body {
        at an inconsistent, often too-narrow size. */
     width: 380px;
     max-height: 600px;
-    overflow-y: auto;
     background-color: #f5f5f5;
+    /* Rounds and clips the popup's own content. The outer window frame
+       Chrome draws around the popup is controlled by the OS, not by this
+       CSS - on macOS it's already rounded by default; on Windows/Linux it
+       stays a plain rectangle regardless of what's set here. */
+    border-radius: 16px;
+    overflow: hidden;
 }
 
 .container {
     width: 100%;
+    max-height: 600px;
+    overflow-y: auto;
     background-color: #fff;
-    padding: 20px;
+    padding: 12px 20px;
     margin-left: auto;
     margin-right: auto;
 }
@@ -35,6 +42,10 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+.header[hidden] {
+    display: none;
 }
 
 .logo img{
@@ -53,10 +64,13 @@ h1 {
     color: #333;
 }
 
+#panel-content {
+    text-align: center;
+}
+
 .start-session {
     text-align: center;
     margin: 20px 0;
-
 }
 
 .play-button {
@@ -71,7 +85,6 @@ h1 {
     cursor: pointer;
     transition: background-color 0.3s ease, transform 0.2s ease;
     display: flex;
-    
     margin-left: auto;
     margin-right: auto;
 }
@@ -103,11 +116,6 @@ h1 {
 .highlight {
     color: blue;
     font-weight: bold;
-}
-
-.start-session p {
-    margin-top: 10px;
-    color: #666;
 }
 
 
@@ -182,37 +190,100 @@ h2 {
 
 .mode-chooser {
     text-align: center;
-    padding: 10px 0 20px;
+    padding: 0;
+}
+
+.mode-chooser-icon {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 8px;
+}
+
+.mode-chooser-icon img {
+    width: 40px;
+    height: 40px;
+}
+
+.mode-chooser-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #222;
+    margin-bottom: 4px;
 }
 
 .choose-mode-text {
     font-size: 14px;
-    color: #333;
-    margin-bottom: 15px;
+    font-weight: 600;
+    color: #222;
+    margin-bottom: 14px;
 }
 
 .mode-button {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 14px;
     width: 100%;
-    padding: 12px;
-    margin-bottom: 10px;
+    text-align: left;
+    padding: 12px 16px;
+    margin-bottom: 12px;
     font-size: 14px;
     font-family: inherit;
     color: #333;
     background-color: #f5f5f5;
-    border: 1px solid #ddd;
-    border-radius: 6px;
+    border: 1px solid #e6e6e6;
+    border-radius: 18px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
 }
 
 .mode-button:hover {
     background-color: #ececec;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.mode-button:active {
+    transform: scale(0.98);
 }
 
 .mode-button:focus {
     outline: 3px solid yellow;
     outline-offset: 2px;
+}
+
+.mode-button:last-child {
+    margin-bottom: 0;
+}
+
+.mode-button-icon {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.05);
+    color: #000;
+    font-size: 17px;
+}
+
+.mode-button-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.mode-button-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #222;
+}
+
+.mode-button-subtitle {
+    font-size: 12px;
+    color: #777;
 }
 
 .mode-error {

@@ -53,6 +53,42 @@ def get_active_capture_mode():
     return _active_session.capture_mode if is_session_active() else None
 
 
+def _stop_threads(threads):
+    """
+    Signals every capturer thread in `threads` to stop and waits for each one
+    to actually exit before returning, so a caller never proceeds (e.g. lets
+    a new session start) while an old thread might still be alive - which
+    would otherwise leave it consuming from the shared event_bus queue and
+    writing into whichever session happens to be active by then.
+    interaction_logger has no entry in CAPTURERS: it's signalled by
+    unblocking its consume() call via event_bus.stop(), not a stop function.
+    @param threads: {name: Thread} of threads to stop
+    @return: names of threads still alive after the timeout (should be empty)
+    """
+    stuck = []
+
+    for name, thread in threads.items():
+        if name == "interaction_logger":
+            continue
+        stop_fn = CAPTURERS.get(name, {}).get("stop")
+        if stop_fn:
+            try:
+                stop_fn()
+            except Exception:
+                pass
+        thread.join(timeout=10)
+        if thread.is_alive():
+            stuck.append(name)
+
+    if "interaction_logger" in threads:
+        event_bus.stop()
+        threads["interaction_logger"].join(timeout=10)
+        if threads["interaction_logger"].is_alive():
+            stuck.append("interaction_logger")
+
+    return stuck
+
+
 def start_session(page_name, page_url, language, capture_mode):
     """
     Starts a new session: validates the capture mode, creates its files via
@@ -92,14 +128,11 @@ def start_session(page_name, page_url, language, capture_mode):
         started_threads["interaction_logger"] = logging_thread
 
     except Exception as error:
-        for name in started_threads:
-            stop_fn = CAPTURERS.get(name, {}).get("stop")
-            if stop_fn:
-                try:
-                    stop_fn()
-                except Exception:
-                    pass
-        raise SessionStartError(f"Failed to start session: {error}") from error
+        stuck = _stop_threads(started_threads)
+        message = f"Failed to start session: {error}"
+        if stuck:
+            message += f" (also timed out stopping: {', '.join(stuck)})"
+        raise SessionStartError(message) from error
 
     session.state = "running"
     _active_session = session
@@ -118,18 +151,9 @@ def stop_session():
     if not is_session_active():
         raise SessionStopError("No session is currently running")
 
-    for name in _active_threads:
-        if name == "interaction_logger":
-            continue
-        stop_fn = CAPTURERS.get(name, {}).get("stop")
-        if stop_fn:
-            stop_fn()
-
-    # interaction_logger isn't in CAPTURERS: it always runs regardless of
-    # capture mode, and it's stopped by unblocking its consume() call rather
-    # than an external stop() function, so it gets a clean, joinable shutdown.
-    event_bus.stop()
-    _active_threads["interaction_logger"].join(timeout=5)
+    stuck = _stop_threads(_active_threads)
+    if stuck:
+        raise SessionStopError(f"Timed out waiting for: {', '.join(stuck)}")
 
     stopped_session = _active_session
     stopped_session.state = "stopped"

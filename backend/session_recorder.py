@@ -1,6 +1,7 @@
 import os
 import time
 from dataclasses import dataclass
+from datetime import datetime
 
 import settings
 
@@ -28,9 +29,12 @@ class Session:
 
 def generate_session_id():
     """
-    Generates a timestamp-based identifier for a session, used to name its files.
+    Generates a timestamp-based identifier for a session, used to name its
+    files. Includes microseconds so two sessions started within the same
+    second (e.g. a quick stop then restart) still get distinct ids, instead
+    of the second one silently overwriting the first's files.
     """
-    return time.strftime('%Y-%m-%d_%H-%M-%S')
+    return datetime.now().strftime('%Y-%m-%d_%H-%M-%S-%f')
 
 
 def _feature_header(page_name, page_url):

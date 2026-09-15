@@ -34,9 +34,14 @@ def main(session):
         if event_bus.is_stop_signal(event):
             break
 
+        print(f"INFO: Logging event {event}")
+
         try:
-            print(f"INFO: Logging event {event}")
             log_event(session, event)
+        except Exception as e:
+            print(f"INFO: Error logging event to {session.events_file}: {e}")
+
+        try:
             log_step(session, event)
         except Exception as e:
-            print(f"INFO: Error logging event: {e}")
+            print(f"INFO: Error logging step to {session.test_file}: {e}")

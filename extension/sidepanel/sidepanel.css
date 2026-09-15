@@ -16,8 +16,6 @@
 body {
     /* A side panel fills whatever space the browser gives it, unlike a
        popup, which needs a fixed size since it has no viewport of its own. */
-    justify-content: center;
-    align-items: center;
     background-color: #f5f5f5;
 }
 

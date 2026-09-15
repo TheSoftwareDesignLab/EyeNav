@@ -1,8 +1,10 @@
 {
     "eyenav-title": "EyeNav",
-    "eyenav-choose-mode": "How do you want to interact?",
-    "eyenav-mode-eye-voice": "👁️ Eye tracking + Voice",
-    "eyenav-mode-mouse-keyboard": "🖱️ Mouse + Keyboard",
+    "eyenav-choose-mode": "Hi! How would you like to interact today?",
+    "eyenav-mode-eye-voice-title": "Eye tracking + Voice",
+    "eyenav-mode-eye-voice-subtitle": "For hands-free use",
+    "eyenav-mode-mouse-keyboard-title": "Mouse + Keyboard",
+    "eyenav-mode-mouse-keyboard-subtitle": "For precise navigation",
     "eyenav-eye-voice-active": "An eye tracking + voice session is running.",
     "eyenav-session-active-unknown-mode": "A session is already running.",
     "eyenav-open-side-panel": "Open side panel",
