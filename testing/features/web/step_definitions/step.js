@@ -23,6 +23,28 @@ Given('I input {string}', async function (text) {
     return await this.driver.keys(text);
 });
 
+Given('I type {string} into field with xpath {string}', async function (text, xpath) {
+    // Same lookup as "I click on tag with xpath" above, and for the same
+    // reason: these xpaths come from the same getXPath(), so whatever made
+    // $$ + the elements[0] == null fallback necessary there applies here too.
+    const elements = await this.driver.$$(xpath);
+    const element = elements[0] == null ? elements[1] : elements[0];
+    await element.click();
+    // Without this, replaying into a field that already has content
+    // (autofill, a default value) appends instead of matching what was
+    // actually recorded.
+    await element.clearValue();
+    return await this.driver.keys(text);
+});
+
+Given('I set the viewport to {int}x{int}', async function (width, height) {
+    // Resizes the OUTER browser window, not the exact content viewport, so
+    // the page's actual viewport ends up slightly smaller than width x
+    // height (browser chrome takes some of it) - close enough to reproduce
+    // the recorded layout, not pixel-perfect.
+    return await this.driver.setWindowSize(width, height);
+});
+
 Given('I scroll down', async function () {
     return await this.driver.pause(1000);
 });

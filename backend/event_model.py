@@ -2,14 +2,12 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 
 # Sources allowed to publish events to the event bus.
-ALLOWED_SOURCES = {"voice", "browser", "mouse", "keyboard"}
+ALLOWED_SOURCES = {"voice", "browser"}
 
 # Event types allowed per source. A source can only publish types listed here.
 ALLOWED_TYPES_BY_SOURCE = {
     "voice": {"input", "enter", "back", "forward", "go"},
-    "browser": {"click"},
-    "mouse": {"click", "move", "scroll"},
-    "keyboard": {"key_press", "text"},
+    "browser": {"click", "input"},
 }
 
 

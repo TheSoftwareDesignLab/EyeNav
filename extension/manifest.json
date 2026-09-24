@@ -9,6 +9,9 @@
     "scripting",
     "sidePanel"
   ],
+  "host_permissions": [
+    "http://localhost:5001/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },

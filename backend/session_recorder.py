@@ -3,6 +3,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 
+import feature_writer
 import settings
 
 EVENTS_DIRECTORY = "events"
@@ -37,20 +38,32 @@ def generate_session_id():
     return datetime.now().strftime('%Y-%m-%d_%H-%M-%S-%f')
 
 
-def _feature_header(page_name, page_url):
+def _feature_header(page_name, page_url, viewport_width=None, viewport_height=None):
     """
     Builds the initial content of a .feature file: same header and first
-    step main.py writes today, kept identical so replay output doesn't change.
+    step main.py used to write, kept identical so replay output doesn't
+    change - plus an optional viewport step, when the caller knows the
+    page's size at session start, written before navigating so the page
+    loads at that size from the first paint.
+
+    page_name/page_url are escaped the same way feature_writer escapes
+    captured click/input data: page_name is a tab title (activeTab.title)
+    and can contain a literal double quote just as easily as any clicked
+    element's text can, which would otherwise corrupt this Scenario line
+    before a single event is even captured.
     """
-    return (
-        f"Feature: Replay of session on {time.strftime('%b %d at %I:%M:%S %p')}\n\n"
-        "@user1 @web\n"
-        f'Scenario: User interacts with the web page named "{page_name}"\n\n'
-        f'\tGiven I navigate to page "{page_url}"\n'
-    )
+    lines = [
+        f"Feature: Replay of session on {time.strftime('%b %d at %I:%M:%S %p')}\n\n",
+        "@user1 @web\n",
+        f'Scenario: User interacts with the web page named "{feature_writer.escape_gherkin_string(page_name)}"\n\n',
+    ]
+    if viewport_width is not None and viewport_height is not None:
+        lines.append(f'\tGiven I set the viewport to {viewport_width}x{viewport_height}\n')
+    lines.append(f'\tGiven I navigate to page "{feature_writer.escape_gherkin_string(page_url)}"\n')
+    return "".join(lines)
 
 
-def create_session(page_name, page_url, language, capture_mode):
+def create_session(page_name, page_url, language, capture_mode, viewport_width=None, viewport_height=None):
     """
     Creates a new session: generates its id, creates its .feature file with
     the initial header already written, and reserves the paths for its
@@ -60,6 +73,8 @@ def create_session(page_name, page_url, language, capture_mode):
     @param page_url: URL of the page the session starts on
     @param language: language code used for voice recognition
     @param capture_mode: capture mode selected for this session
+    @param viewport_width: the tracked tab's viewport width at session start, if known
+    @param viewport_height: the tracked tab's viewport height at session start, if known
     @return: the created Session
     """
     session_id = generate_session_id()
@@ -69,7 +84,7 @@ def create_session(page_name, page_url, language, capture_mode):
     events_file = os.path.join(EVENTS_DIRECTORY, f"events_{session_id}.jsonl")
 
     with open(test_file, "w") as f:
-        f.write(_feature_header(page_name, page_url))
+        f.write(_feature_header(page_name, page_url, viewport_width, viewport_height))
 
     return Session(
         session_id=session_id,

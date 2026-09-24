@@ -105,39 +105,66 @@ function initEyeNavPanel(captureMode, knownStatus) {
     }
 
     /**
+     * Reads the tracked tab's current viewport size, so the recorded
+     * .feature can reproduce the page at the same size. Best-effort: some
+     * pages (e.g. chrome:// URLs) don't allow script injection, so this
+     * resolves to null instead of blocking session start over it.
+     * @param {number} tabId
+     * @return {Promise<{width: number, height: number}|null>}
+     */
+    function getViewportSize(tabId) {
+        return chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => ({ width: window.innerWidth, height: window.innerHeight })
+        })
+            .then(results => (results[0] && results[0].result) || null)
+            .catch(error => {
+                console.warn('EYENAV: Could not read viewport size:', error);
+                return null;
+            });
+    }
+
+    /**
      * Start the orchestrated session, in this surface's capture mode.
      */
     function startSession() {
         chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
             const activeTab = tabs[0];
-            const pageDetails = {
-                pageName: activeTab.title,
-                pageUrl: activeTab.url,
-                captureMode: captureMode
-            };
 
-            console.log('EYENAV: Starting session with page details:', pageDetails);
+            getViewportSize(activeTab.id).then(viewport => {
+                const pageDetails = {
+                    pageName: activeTab.title,
+                    pageUrl: activeTab.url,
+                    captureMode: captureMode
+                };
+                if (viewport) {
+                    pageDetails.viewportWidth = viewport.width;
+                    pageDetails.viewportHeight = viewport.height;
+                }
 
-            fetch('http://localhost:5001/start', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Language': language
-                },
-                body: JSON.stringify(pageDetails)
-            })
-                .then(response => response.json().then(data => ({ ok: response.ok, data })))
-                .then(({ ok, data }) => {
-                    if (!ok) {
-                        throw new Error(data.status || 'Failed to start session');
-                    }
-                    alertBelowButton.textContent = strings['sessionStarted'] || 'Session started.';
-                    setStoppableState();
+                console.log('EYENAV: Starting session with page details:', pageDetails);
+
+                fetch('http://localhost:5001/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Language': language
+                    },
+                    body: JSON.stringify(pageDetails)
                 })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alertBelowButton.textContent = strings['failedToStart'] || 'Failed to start session. Ensure the server is running.';
-                });
+                    .then(response => response.json().then(data => ({ ok: response.ok, data })))
+                    .then(({ ok, data }) => {
+                        if (!ok) {
+                            throw new Error(data.status || 'Failed to start session');
+                        }
+                        alertBelowButton.textContent = strings['sessionStarted'] || 'Session started.';
+                        setStoppableState();
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alertBelowButton.textContent = strings['failedToStart'] || 'Failed to start session. Ensure the server is running.';
+                    });
+            });
         });
     }
 
