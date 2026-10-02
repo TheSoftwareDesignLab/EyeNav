@@ -43,12 +43,24 @@ def to_gherkin_step(event):
     data = event.data
 
     if event.type == "click":
+        xpath = data.get("xpath")
+        # Scrolls the target into view and waits for it to render before the
+        # click step below runs, regardless of which of the 3 forms that
+        # click step ends up taking - content.js always computes an xpath
+        # (getXPath() runs unconditionally in handleClick), even for an
+        # element that also has an href/id, so this doesn't depend on which
+        # branch below is chosen. Skipped only when getXPath() itself
+        # couldn't resolve one (returns null) - nothing to scroll to then.
+        scroll_step = (
+            f'\tAnd I scroll until I can see the element with xpath "{escape_gherkin_string(xpath)}"\n'
+            if xpath else ""
+        )
         if data.get("href"):
-            return f'\tAnd I click on tag with href "{escape_gherkin_string(data["href"])}"'
+            return f'{scroll_step}\tAnd I click on tag with href "{escape_gherkin_string(data["href"])}"'
         elif data.get("id"):
-            return f'\tAnd I click on tag with id "{escape_gherkin_string(data["id"])}"'
-        elif data.get("xpath"):
-            return f'\tAnd I click on tag with xpath "{escape_gherkin_string(data["xpath"])}"'
+            return f'{scroll_step}\tAnd I click on tag with id "{escape_gherkin_string(data["id"])}"'
+        elif xpath:
+            return f'{scroll_step}\tAnd I click on tag with xpath "{escape_gherkin_string(xpath)}"'
         # No usable target at all (a malformed event, or getXPath() couldn't
         # resolve one) - nothing to replay, so skip the step instead of
         # crashing on escape_gherkin_string(None) the way this used to.
@@ -76,5 +88,17 @@ def to_gherkin_step(event):
 
     if event.type == "go":
         return '\tAnd I scroll down' if data.get("direction", 0) > 0 else '\tAnd I scroll up'
+
+    if event.type == "resize":
+        # Reuses the exact same step text _feature_header writes for the
+        # initial viewport, just with "And" instead of "Given" to match every
+        # other step this function emits - Cucumber matches steps by text,
+        # not by keyword, so "I set the viewport to WxH" needs no separate
+        # step definition for a resize happening mid-session versus at the
+        # very start of the scenario.
+        width, height = data.get("width"), data.get("height")
+        if width is None or height is None:
+            return None
+        return f'\tAnd I set the viewport to {width}x{height}'
 
     return None

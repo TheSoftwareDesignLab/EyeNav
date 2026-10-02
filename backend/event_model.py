@@ -7,7 +7,7 @@ ALLOWED_SOURCES = {"voice", "browser"}
 # Event types allowed per source. A source can only publish types listed here.
 ALLOWED_TYPES_BY_SOURCE = {
     "voice": {"input", "enter", "back", "forward", "go"},
-    "browser": {"click", "input"},
+    "browser": {"click", "input", "resize"},
 }
 
 

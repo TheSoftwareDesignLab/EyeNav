@@ -25,4 +25,5 @@ const EYENAV_BACKEND_URL = 'http://localhost:5001';
 const EYENAV_WEBSOCKET_URL = 'ws://localhost:5002/';
 const EYENAV_MESSAGE_TYPES = {
     REPORT: 'EYENAV_REPORT',
+    GET_VIEWPORT: 'EYENAV_GET_VIEWPORT',
 };

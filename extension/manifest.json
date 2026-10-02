@@ -5,7 +5,6 @@
   "permissions": [
     "activeTab",
     "tabs",
-    "scripting",
     "sidePanel"
   ],
   "host_permissions": [

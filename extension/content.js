@@ -228,6 +228,26 @@ function handleInputCommit(event) {
     reportEvent('/input-info', inputData, 'Input committed');
 }
 
+// How long to wait after the last resize tick before reporting the viewport
+// size - a window drag fires 'resize' continuously (dozens of events for one
+// gesture), so reporting on every tick would flood the session with
+// near-duplicate viewport steps. Reporting only once resizing settles
+// records the one size that actually mattered: the one the user ended up at.
+const RESIZE_REPORT_DEBOUNCE_MS = 400;
+let resizeReportTimer = null;
+
+/**
+ * Handle the window being resized mid-session - debounced (see above), so
+ * only the final size after a resize gesture settles gets reported, not
+ * every intermediate frame.
+ */
+function handleResize() {
+    clearTimeout(resizeReportTimer);
+    resizeReportTimer = setTimeout(() => {
+        reportEvent('/viewport-info', { width: window.innerWidth, height: window.innerHeight }, 'Viewport resized');
+    }, RESIZE_REPORT_DEBOUNCE_MS);
+}
+
 /**
  * Attaches the click handler to `node` itself and to every descendant that
  * matches INTERACTIVE_TAGS_SELECTOR - shared by both branches of
@@ -295,7 +315,26 @@ function mutationCallback(mutations) {
 function addEventListeners() {
     document.addEventListener('click', handleClick, true);  // Capture phase
     document.addEventListener('change', handleInputCommit, true);  // Fires once the field is committed, not per keystroke
+    window.addEventListener('resize', handleResize);
 }
+
+/**
+ * Reports this page's current viewport size on request. Answering from here
+ * (a content script that's already running, declared unconditionally in
+ * manifest.json) instead of panel.js injecting a script via
+ * chrome.scripting.executeScript sidesteps that API's permission model:
+ * executeScript only works on the one tab Chrome granted `activeTab` to -
+ * whichever tab was focused the moment the extension's icon was clicked -
+ * and the side panel is designed to stay open across tab switches, so asking
+ * for the viewport of a DIFFERENT tab than that one silently failed.
+ * chrome.tabs.sendMessage, by contrast, just needs a content script already
+ * listening in the target tab, which this one always is.
+ */
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (!message || message.type !== EYENAV_MESSAGE_TYPES.GET_VIEWPORT) return false;
+    sendResponse({ width: window.innerWidth, height: window.innerHeight });
+    return false; // synchronous response, no need to keep the channel open
+});
 
 
 /**

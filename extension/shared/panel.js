@@ -202,22 +202,29 @@ function initEyeNavPanel(captureMode, knownStatus) {
 
     /**
      * Reads the tracked tab's current viewport size, so the recorded
-     * .feature can reproduce the page at the same size. Best-effort: some
-     * pages (e.g. chrome:// URLs) don't allow script injection, so this
-     * resolves to null instead of blocking session start over it.
+     * .feature can reproduce the page at the same size. Asks content.js (via
+     * message, not chrome.scripting.executeScript) since content.js is
+     * already running in every tab unconditionally - executeScript would
+     * only work on the one tab Chrome granted activeTab to when the
+     * extension's icon was clicked, which silently breaks the moment the
+     * side panel is left open across a tab switch (its whole reason for
+     * being a side panel instead of a popup). Best-effort either way: some
+     * pages (e.g. chrome:// URLs) have no content script to answer at all,
+     * so this resolves to null instead of blocking session start over it.
      * @param {number} tabId
      * @return {Promise<{width: number, height: number}|null>}
      */
     function getViewportSize(tabId) {
-        return chrome.scripting.executeScript({
-            target: { tabId },
-            func: () => ({ width: window.innerWidth, height: window.innerHeight })
-        })
-            .then(results => (results[0] && results[0].result) || null)
-            .catch(error => {
-                console.warn('EYENAV: Could not read viewport size:', error);
-                return null;
+        return new Promise((resolve) => {
+            chrome.tabs.sendMessage(tabId, { type: EYENAV_MESSAGE_TYPES.GET_VIEWPORT }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.warn('EYENAV: Could not read viewport size:', chrome.runtime.lastError.message);
+                    resolve(null);
+                    return;
+                }
+                resolve(response || null);
             });
+        });
     }
 
     /**

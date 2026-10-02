@@ -6,6 +6,7 @@ from websocket_server import start_websocket_server
 import event_bus
 import event_model
 import session_manager
+import session_recorder
 
 # interaction_logger, session_manager, voice_control, and eye_tracking log
 # recording/capturer failures through the logging module (not print()) so
@@ -205,6 +206,29 @@ def input_info():
             return jsonify({"status": str(error)}), 400
 
     return jsonify({"status": "Input information received"}), 200
+
+
+@app.route('/viewport-info', methods=['POST'])
+def viewport_info():
+    data, error = _json_object_or_400()
+    if error:
+        return error
+
+    # Reuses session_recorder's own viewport validation instead of a second
+    # copy - it already rejects the same malformed-value cases (wrong type,
+    # zero, negative, Infinity, a JSON boolean) that /start's viewport fields
+    # need rejected, and a resize event is just a viewport value arriving
+    # mid-session instead of at session start.
+    width = session_recorder.parse_viewport_dimension(data.get('width'))
+    height = session_recorder.parse_viewport_dimension(data.get('height'))
+
+    if width is not None and height is not None and session_manager.is_session_active():
+        try:
+            event_bus.publish("browser", "resize", {"width": width, "height": height})
+        except event_model.InvalidEventError as error:
+            return jsonify({"status": str(error)}), 400
+
+    return jsonify({"status": "Viewport information received"}), 200
 
 
 if __name__ == '__main__':
