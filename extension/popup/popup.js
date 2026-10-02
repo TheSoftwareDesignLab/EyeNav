@@ -123,10 +123,10 @@ document.addEventListener('DOMContentLoaded', function () {
         // once mouse/keyboard capturers exist) is driven from the side
         // panel, so just point there instead of also giving the popup its
         // own stop button for it.
-        if (status && status.sessionActive && status.captureMode === 'mouse_keyboard') {
+        if (status && status.sessionActive && EYENAV_SURFACES.mouse_keyboard.modes.includes(status.captureMode)) {
             showPanel(status.captureMode, status);
         } else if (status && status.sessionActive) {
-            eyeVoiceActiveText.textContent = status.captureMode === 'eye_voice'
+            eyeVoiceActiveText.textContent = EYENAV_SURFACES.eye_voice.modes.includes(status.captureMode)
                 ? (strings['eyenav-eye-voice-active'] || 'An eye tracking + voice session is running.')
                 : (strings['eyenav-session-active-unknown-mode'] || 'A session is already running.');
             modeChooser.hidden = true;

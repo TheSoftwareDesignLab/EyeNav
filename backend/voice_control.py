@@ -211,6 +211,31 @@ def recognize_voice():
                 execute_command(command)
 
 
+def prepare_voice_control():
+    """
+    Resets everything a session's voice run depends on. Called by
+    session_manager from the thread that STARTS the session, before the
+    capturer thread exists - not from inside main(). main() used to set
+    is_voice_recognition_active = True itself, after the (slow) model load: a
+    Stop that arrived during that load set it False and main() then set it
+    back to True, so the thread never exited and the session could not be
+    stopped. Setting it here means a Stop during the load simply wins.
+
+    Also clears what the previous session left behind: typing mode left on
+    (the next session would start pasting dictation into whatever has focus),
+    a half-typed buffer, and audio recorded before this session started.
+    """
+    global is_voice_recognition_active, is_typing_mode, typed_text_buffer
+    is_voice_recognition_active = True
+    is_typing_mode = False
+    typed_text_buffer = ""
+    while not audio_queue.empty():
+        try:
+            audio_queue.get_nowait()
+        except queue.Empty:
+            break
+
+
 def stop_voice_control():
     """
     Stops voice control
@@ -241,9 +266,6 @@ def main(session):
     set_voice_language(session.language, session)
     print(f"INFO: Starting voice control in {session.language}...")
 
-    global is_voice_recognition_active
-    is_voice_recognition_active = True
-
     with sd.RawInputStream(samplerate=16000, blocksize=8000, dtype='int16',
                            channels=1, callback=audio_callback):
         recognize_voice()
@@ -251,4 +273,5 @@ def main(session):
 
 if __name__ == "__main__":
     import session_recorder
+    prepare_voice_control()
     main(session_recorder.create_session("Manual test", "http://localhost", "en-us", "eye_voice"))

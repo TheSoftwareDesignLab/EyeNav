@@ -238,3 +238,13 @@ h2 {
     color: red;
     padding: 0 0 15px;
 }
+
+/* Backend recording problems / per-tab warning (panel.js renderNotices).
+   pre-line so a warning and an error list each get their own line. */
+.session-notices {
+    text-align: center;
+    font-size: 13px;
+    color: #b3541e;
+    white-space: pre-line;
+    padding: 0 0 15px;
+}

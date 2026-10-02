@@ -3,11 +3,19 @@ import threading
 import time
 import queue
 
+import security
+
 connected_clients = []
 message_queue = queue.Queue() 
 
 class WebSocketApp(WebSocketApplication):
     def on_open(self):
+        # A web page can open ws://localhost:5002 too, and every client gets
+        # the live voice transcription - dictated text included.
+        if not security.is_trusted_origin(self.ws.environ.get("HTTP_ORIGIN")):
+            print("INFO: Rejected WebSocket connection from an untrusted origin")
+            self.ws.close()
+            return
         connected_clients.append(self.ws)
         print("INFO: New WebSocket connection established")
     
@@ -17,7 +25,8 @@ class WebSocketApp(WebSocketApplication):
 
     def on_close(self, reason):
         print("INFO: WebSocket connection closed")
-        connected_clients.remove(self.ws)
+        if self.ws in connected_clients:
+            connected_clients.remove(self.ws)
 
     def keep_alive(self):
         while not self.ws.closed:
@@ -32,7 +41,7 @@ class WebSocketApp(WebSocketApplication):
 def websocket_server():
     port = 5002
     resource = Resource([('/', WebSocketApp)])
-    ws_server = WebSocketServer(('0.0.0.0', port), resource)
+    ws_server = WebSocketServer(('127.0.0.1', port), resource)
     print(f"INFO: Starting WebSocket server on ws:// on port {port}")
     ws_server.serve_forever()
 

@@ -27,3 +27,30 @@ const EYENAV_MESSAGE_TYPES = {
     REPORT: 'EYENAV_REPORT',
     GET_VIEWPORT: 'EYENAV_GET_VIEWPORT',
 };
+
+/**
+ * The two surfaces that can drive a session, keyed by the capture mode each
+ * STARTS sessions in (what initEyeNavPanel receives):
+ *  - modes: the active-session capture modes the surface drives itself
+ *    (shows the Stop button for). A running session in any mode not listed
+ *    belongs to the OTHER surface, so this one blocks its own Play button
+ *    instead of competing with it. 'all' belongs to the side panel since it
+ *    includes eye tracking + voice, which is what that panel's live voice
+ *    visualization is for.
+ *  - runningMessageKey / runningMessage: what the OTHER surface shows while
+ *    a session of these modes is running (locale key, plus the English
+ *    fallback), naming where to stop it. One table, so who-drives-what and
+ *    what-to-tell-the-user can't drift apart.
+ */
+const EYENAV_SURFACES = {
+    eye_voice: {
+        modes: ['eye_voice', 'all'],
+        runningMessageKey: 'sessionRunningEyeVoice',
+        runningMessage: 'An Eye tracking + Voice session is running. Stop it from the side panel before starting another.',
+    },
+    mouse_keyboard: {
+        modes: ['mouse_keyboard'],
+        runningMessageKey: 'sessionRunningMouseKeyboard',
+        runningMessage: 'A Mouse + Keyboard session is running. Stop it from the extension popup before starting another.',
+    },
+};

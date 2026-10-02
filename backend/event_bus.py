@@ -41,3 +41,18 @@ def stop():
     Unblocks whoever is waiting in consume() so it can exit its loop.
     """
     _queue.put(_STOP)
+
+
+def reset():
+    """
+    Discards everything still queued and starts from an empty queue. The
+    queue is process-global and outlives every session, so anything left in
+    it - events nobody consumed (published while no logger was running), or
+    a stop sentinel from a stop that was retried - would otherwise be the
+    first thing the NEXT session's logger reads: the old events would be
+    written into the new session's files, and a stale sentinel would make
+    that logger exit immediately so the whole session records nothing.
+    Called when a session starts, before its logger thread exists.
+    """
+    global _queue
+    _queue = queue.Queue()

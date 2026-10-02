@@ -201,6 +201,49 @@ function initEyeNavPanel(captureMode, knownStatus) {
     }
 
     /**
+     * A session is running in a mode the OTHER surface drives: neither start
+     * nor stop is offered here (each mode is stopped from the surface that
+     * started it), and the alert says what's running and where to stop it.
+     * @param {string} activeMode - the running session's capture mode
+     */
+    function setBlockedState(activeMode) {
+        playButton.innerHTML = '<span>&#9658;</span>';
+        playButton.removeEventListener('click', startSession);
+        playButton.removeEventListener('click', stopSession);
+        disablePlayButton();
+        setAlert(blockedMessage(activeMode), 'black');
+    }
+
+    function blockedMessage(activeMode) {
+        const owner = Object.values(EYENAV_SURFACES).find(surface => surface.modes.includes(activeMode));
+        if (!owner) {
+            return strings['eyenav-session-active-unknown-mode'] || 'A session is already running.';
+        }
+        return strings[owner.runningMessageKey] || owner.runningMessage;
+    }
+
+    // Notices under the Play button: what the backend recorded as having gone
+    // wrong (the /status errors the panel already receives every poll), plus
+    // a local warning for this tab. Both are shown in the same element, which
+    // is optional - a surface without #session-notices simply shows none.
+    const sessionNotices = document.getElementById('session-notices');
+    let backendErrors = [];
+    let localWarning = null;
+
+    function renderNotices() {
+        if (!sessionNotices) return;
+        const lines = [];
+        if (localWarning) lines.push(localWarning);
+        if (backendErrors.length > 0) {
+            const latest = backendErrors[backendErrors.length - 1];
+            const more = backendErrors.length > 1 ? ` (+${backendErrors.length - 1})` : '';
+            lines.push(`${strings['sessionHasErrors'] || 'Recording problems detected'}: ${latest}${more}`);
+        }
+        sessionNotices.textContent = lines.join('\n');
+        sessionNotices.hidden = lines.length === 0;
+    }
+
+    /**
      * Reads the tracked tab's current viewport size, so the recorded
      * .feature can reproduce the page at the same size. Asks content.js (via
      * message, not chrome.scripting.executeScript) since content.js is
@@ -208,21 +251,23 @@ function initEyeNavPanel(captureMode, knownStatus) {
      * only work on the one tab Chrome granted activeTab to when the
      * extension's icon was clicked, which silently breaks the moment the
      * side panel is left open across a tab switch (its whole reason for
-     * being a side panel instead of a popup). Best-effort either way: some
-     * pages (e.g. chrome:// URLs) have no content script to answer at all,
-     * so this resolves to null instead of blocking session start over it.
+     * being a side panel instead of a popup). Best-effort: it never blocks
+     * session start. When no content script answers (a chrome:// page, or a
+     * tab opened before the extension was loaded), `reachable` is false -
+     * that same condition means no click or typing will be captured from the
+     * tab at all, so the caller surfaces it instead of only logging it.
      * @param {number} tabId
-     * @return {Promise<{width: number, height: number}|null>}
+     * @return {Promise<{viewport: {width: number, height: number}|null, reachable: boolean}>}
      */
     function getViewportSize(tabId) {
         return new Promise((resolve) => {
             chrome.tabs.sendMessage(tabId, { type: EYENAV_MESSAGE_TYPES.GET_VIEWPORT }, (response) => {
                 if (chrome.runtime.lastError) {
                     console.warn('EYENAV: Could not read viewport size:', chrome.runtime.lastError.message);
-                    resolve(null);
+                    resolve({ viewport: null, reachable: false });
                     return;
                 }
-                resolve(response || null);
+                resolve({ viewport: response || null, reachable: true });
             });
         });
     }
@@ -234,7 +279,7 @@ function initEyeNavPanel(captureMode, knownStatus) {
         chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
             const activeTab = tabs[0];
 
-            getViewportSize(activeTab.id).then(viewport => {
+            getViewportSize(activeTab.id).then(({ viewport, reachable }) => {
                 const pageDetails = {
                     pageName: activeTab.title,
                     pageUrl: activeTab.url,
@@ -255,13 +300,30 @@ function initEyeNavPanel(captureMode, knownStatus) {
                     },
                     body: JSON.stringify(pageDetails)
                 })
-                    .then(response => response.json().then(data => ({ ok: response.ok, data })))
-                    .then(({ ok, data }) => {
+                    .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, data })))
+                    .then(({ ok, status, data }) => {
+                        if (status === 409) {
+                            // Another session got there first (started from
+                            // the other surface since this one last checked) -
+                            // not a failure to report, a state to sync to.
+                            applyStatus({ sessionActive: true, captureMode: data.activeCaptureMode });
+                            return;
+                        }
                         if (!ok) {
                             throw new Error(data.status || 'Failed to start session');
                         }
                         setAlert(strings['sessionStarted'] || 'Session started');
                         setStoppableState();
+                        // Any /status request still in flight was sent before
+                        // this session existed: its (idle) answer is stale.
+                        statusRequestSeq++;
+                        lastStatusKey = statusKey({ sessionActive: true, captureMode });
+                        // A new session starts with no errors; what's still
+                        // shown is the previous session's, until the next
+                        // /status answer would have replaced it.
+                        backendErrors = [];
+                        localWarning = reachable ? null : (strings['pageNotReachable'] || "EyeNav is not active on this page, so clicks and typing here won't be recorded. Reload the page.");
+                        renderNotices();
                     })
                     .catch(error => {
                         console.error('Error:', error);
@@ -275,7 +337,7 @@ function initEyeNavPanel(captureMode, knownStatus) {
      * Stop the orchestrated session
      */
     function stopSession() {
-        fetch(`${EYENAV_BACKEND_URL}/stop`)
+        fetch(`${EYENAV_BACKEND_URL}/stop`, { method: 'POST' })
             .then(response => response.json().then(data => ({ ok: response.ok, data })))
             .then(({ ok, data }) => {
                 if (!ok) {
@@ -283,6 +345,10 @@ function initEyeNavPanel(captureMode, knownStatus) {
                 }
                 setAlert(strings['sessionStopped'] || 'Session stopped');
                 setStartableState();
+                statusRequestSeq++;
+                lastStatusKey = statusKey({ sessionActive: false });
+                localWarning = null;
+                renderNotices();
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -290,42 +356,123 @@ function initEyeNavPanel(captureMode, knownStatus) {
             });
     }
 
+    // How often an open surface re-reads /status. The side panel stays open
+    // for a whole recording and the popup can be left open too, so neither
+    // can trust the one snapshot taken when it opened: a session started
+    // from the other surface in the meantime would leave this one offering
+    // a Play button that can only fail.
+    const STATUS_POLL_INTERVAL_MS = 2000;
+    // Shorter than a stuck backend would take to answer, but long enough for
+    // a busy one (e.g. loading the voice model) not to look like "offline".
+    const STATUS_REQUEST_TIMEOUT_MS = 4000;
+
+    // What this surface last drew (see statusKey), so a refresh only redraws
+    // on a REAL change - a session started/stopped from elsewhere, the server
+    // going away or coming back. Redrawing every tick would overwrite
+    // "Session stopped" with the idle prompt two seconds after Stop.
+    let lastStatusKey = null;
+
+    // Orders /status answers: each request takes a number, and only the
+    // newest request's answer is applied. Start/stop bump it too, so an
+    // answer to a request sent BEFORE the action - which describes the world
+    // before it - can't redraw an outdated state over the action's result.
+    let statusRequestSeq = 0;
+    let statusRequestsInFlight = 0;
+
+    function statusKey(data) {
+        return data.sessionActive ? `active:${data.captureMode}` : 'idle';
+    }
+
+    function ownsSession(activeMode) {
+        const surface = EYENAV_SURFACES[captureMode];
+        return surface ? surface.modes.includes(activeMode) : activeMode === captureMode;
+    }
+
     /**
      * Check the status of the server, and whether a session is already
      * running - this surface can be destroyed and recreated (popup) or
-     * reloaded, so it can't just remember this itself.
+     * reloaded, so it can't just remember this itself - then keep checking
+     * (see STATUS_POLL_INTERVAL_MS).
      */
     function checkServerStatus() {
         if (knownStatus) {
             // Caller already fetched /status (e.g. the popup, to decide
             // whether to show the mode chooser) - don't fetch it again.
             applyStatus(knownStatus);
-            return;
+        } else {
+            refreshStatus();
         }
 
-        fetch(`${EYENAV_BACKEND_URL}/status`)
+        // A tick is skipped while a request is still in flight, so a stalled
+        // backend can't pile up requests (and use up the browser's
+        // per-host connection limit that this panel's own /start and /stop
+        // calls also need).
+        setInterval(() => {
+            if (!document.hidden && statusRequestsInFlight === 0) refreshStatus();
+        }, STATUS_POLL_INTERVAL_MS);
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) refreshStatus();
+        });
+    }
+
+    function refreshStatus() {
+        const seq = ++statusRequestSeq;
+        statusRequestsInFlight++;
+        return fetch(`${EYENAV_BACKEND_URL}/status`, { signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS) })
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Server not reachable');
                 }
                 return response.json();
             })
-            .then(applyStatus)
+            .then(data => {
+                if (seq === statusRequestSeq) applyStatus(data);
+            })
             .catch(error => {
-                console.error('Error:', error);
-                setAlert(strings['eyenav-ensure-server-running'] || "Ensure the server is running", 'red');
-                disablePlayButton();
+                if (seq === statusRequestSeq) applyOffline(error);
+            })
+            .finally(() => {
+                statusRequestsInFlight--;
             });
     }
 
+    function applyOffline(error) {
+        if (lastStatusKey === 'offline') return;
+        lastStatusKey = 'offline';
+        console.error('Error:', error);
+        backendErrors = [];
+        localWarning = null;
+        renderNotices();
+        setAlert(strings['eyenav-ensure-server-running'] || "Ensure the server is running", 'red');
+        disablePlayButton();
+    }
+
     function applyStatus(data) {
-        enablePlayButton();
-        if (data.sessionActive) {
-            setAlert(strings['sessionStarted'] || 'Session started');
-            setStoppableState();
-        } else {
+        // Notices follow every answer (an error can appear while the session
+        // is otherwise unchanged), unlike the state below, which only
+        // redraws on a change. A synthetic status without `errors` (the 409
+        // path) leaves what's shown alone.
+        if (Array.isArray(data.errors)) {
+            backendErrors = data.errors;
+            renderNotices();
+        }
+
+        const key = statusKey(data);
+        if (key === lastStatusKey) return;
+        lastStatusKey = key;
+
+        if (!data.sessionActive) {
+            localWarning = null;
+            renderNotices();
+            enablePlayButton();
             setAlert(strings['eyenav-start-message'] || "Start an orchestrated session", 'black');
             setStartableState();
+        } else if (ownsSession(data.captureMode)) {
+            enablePlayButton();
+            setAlert(strings['sessionStarted'] || 'Session started', 'black');
+            setStoppableState();
+        } else {
+            setBlockedState(data.captureMode);
         }
     }
 

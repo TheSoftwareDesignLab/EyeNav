@@ -3,7 +3,6 @@
   "name": "EyeNav",
   "version": "1.0",
   "permissions": [
-    "activeTab",
     "tabs",
     "sidePanel"
   ],

@@ -107,6 +107,14 @@ h1 {
     color: #666;
 }
 
+/* Backend recording problems / per-tab warning (panel.js renderNotices).
+   pre-line so a warning and an error list each get their own line. */
+.start-session p.session-notices {
+    font-size: 13px;
+    color: #b3541e;
+    white-space: pre-line;
+}
+
 
 
 h2 {

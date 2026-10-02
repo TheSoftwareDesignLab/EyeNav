@@ -74,9 +74,21 @@ def track_gaze(session):
     if my_eyetracker:
         unsubscribe_from_gaze_data(my_eyetracker)
 
-def start_eye_tracking(session):
-    global is_tracking
+def prepare_eye_tracking():
+    """
+    Arms the tracker and clears the previous session's leftovers. Called by
+    session_manager before the capturer thread exists: start_eye_tracking used
+    to set is_tracking = True itself, so a Stop landing before the thread got
+    scheduled was overwritten and the thread then ran forever.
+    """
+    global is_tracking, previous_position, global_gaze_data
     is_tracking = True
+    previous_position = None
+    global_gaze_data = None
+    gaze_buffer.clear()
+
+
+def start_eye_tracking(session):
     track_gaze(session)
 
 def stop_eye_tracking():

@@ -126,6 +126,14 @@ function sendToBackground(endpoint, data) {
                 reject(new Error((response && response.error) || 'Unknown error'));
                 return;
             }
+            // `success` only says the relay reached the backend; `ok` says
+            // the backend accepted it. Without this check a 400/500 (a
+            // rejected event) was logged as "info received" and the step
+            // silently never made it into the .feature.
+            if (response.ok === false) {
+                reject(new Error(`Backend rejected ${endpoint}: ${(response.data && response.data.status) || 'unknown reason'}`));
+                return;
+            }
             resolve(response.data);
         });
     });
@@ -149,6 +157,8 @@ function reportEvent(endpoint, data, label) {
 function handleClick(event) {
     if (event.isEyeNavHandled) return;  // Prevent duplicate execution
     event.isEyeNavHandled = true;  // Mark event as handled by EyeNav
+
+    flushPendingResize();
 
     const element = event.target;
 
@@ -215,6 +225,8 @@ function handleInputCommit(event) {
     if (event.isEyeNavHandled) return;
     event.isEyeNavHandled = true;
 
+    flushPendingResize();
+
     // `change` only fires when the value actually changed, so this also
     // correctly captures the user clearing a field back to empty - an
     // earlier `if (!value) return` here silently dropped that case.
@@ -236,15 +248,48 @@ function handleInputCommit(event) {
 const RESIZE_REPORT_DEBOUNCE_MS = 400;
 let resizeReportTimer = null;
 
+// Browser zoom (Ctrl +/-) also fires 'resize' and changes innerWidth/Height
+// (they're in CSS px), but the window itself didn't change size. It shows up
+// as a devicePixelRatio change, which is how handleResize tells the two apart.
+let lastDevicePixelRatio = window.devicePixelRatio;
+
+function reportViewportNow() {
+    reportEvent('/viewport-info', { width: window.innerWidth, height: window.innerHeight }, 'Viewport resized');
+}
+
+/**
+ * Reports a pending (debounced) resize immediately. Called before every
+ * click/input report: the debounce delays the resize by up to
+ * RESIZE_REPORT_DEBOUNCE_MS, so without this a click made right after a
+ * resize was reported FIRST and the resize after it - the .feature would
+ * then replay them in the wrong order.
+ */
+function flushPendingResize() {
+    if (resizeReportTimer === null) return;
+    clearTimeout(resizeReportTimer);
+    resizeReportTimer = null;
+    reportViewportNow();
+}
+
 /**
  * Handle the window being resized mid-session - debounced (see above), so
  * only the final size after a resize gesture settles gets reported, not
- * every intermediate frame.
+ * every intermediate frame. A resize that is really a zoom change is dropped
+ * (along with any pending report, which would carry the zoomed size) instead
+ * of being recorded as the window shrinking or growing.
  */
 function handleResize() {
+    if (window.devicePixelRatio !== lastDevicePixelRatio) {
+        lastDevicePixelRatio = window.devicePixelRatio;
+        clearTimeout(resizeReportTimer);
+        resizeReportTimer = null;
+        return;
+    }
+
     clearTimeout(resizeReportTimer);
     resizeReportTimer = setTimeout(() => {
-        reportEvent('/viewport-info', { width: window.innerWidth, height: window.innerHeight }, 'Viewport resized');
+        resizeReportTimer = null;
+        reportViewportNow();
     }, RESIZE_REPORT_DEBOUNCE_MS);
 }
 

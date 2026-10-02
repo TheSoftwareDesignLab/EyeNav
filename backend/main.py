@@ -2,6 +2,7 @@ import logging
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+import security
 from websocket_server import start_websocket_server
 import event_bus
 import event_model
@@ -19,16 +20,25 @@ import session_recorder
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 app = Flask(__name__)
-# allow_private_network=True: Chrome's Private Network Access policy blocks
-# a request from a public page (any ordinary https:// site) to a loopback
-# address like localhost:5001 unless the server explicitly opts in on the
-# preflight. Without this, flask-cors answers Chrome's
-# Access-Control-Request-Private-Network preflight with
-# Access-Control-Allow-Private-Network: false (its own default), and every
-# content.js fetch() to this server fails with "blocked by CORS policy: ...
-# loopback address space" - regardless of Access-Control-Allow-Origin
-# already being correct.
-CORS(app, allow_private_network=True)
+# CORS is limited to the extension's own origin (see security.py). It used to
+# allow every origin, which let any website the user visits preflight and then
+# call /start, /stop and the capture routes on this loopback server.
+# allow_private_network=True is still needed: Chrome's Private Network Access
+# policy otherwise answers the extension's preflight with
+# Access-Control-Allow-Private-Network: false.
+CORS(app, origins=[security.EXTENSION_ORIGIN], allow_private_network=True)
+
+
+@app.before_request
+def _reject_untrusted_callers():
+    """
+    CORS only stops a page from READING a response; a "simple" cross-origin
+    request (a form POST, an <img> GET) still reaches the route and acts. So
+    callers are rejected up front: a foreign Origin, or a Host header that
+    isn't loopback (DNS rebinding).
+    """
+    if not security.is_local_host(request.host) or not security.is_trusted_origin(request.headers.get("Origin")):
+        return jsonify({"status": "Forbidden"}), 403
 
 
 def _require_json_object():
@@ -80,22 +90,36 @@ def _as_str(value):
     return value if isinstance(value, str) else None
 
 
+def _publish_browser_event(event_type, data, skip_in_modes=()):
+    """
+    Publishes a content.js-reported event to the event bus, but only while a
+    session is recording - /tag-info, /input-info and /viewport-info all
+    share this, so the "is something recording, and did the event pass
+    validation" contract lives in one place instead of three copies.
+    @param event_type: one of event_model.ALLOWED_TYPES_BY_SOURCE["browser"]
+    @param data: the event's payload
+    @param skip_in_modes: capture modes in which this event is deliberately dropped
+    @return: an error response to return from the route, or None
+    """
+    # One read gives both "is a session active" (None means no) and its mode.
+    mode = session_manager.get_active_capture_mode()
+    if mode is None or mode in skip_in_modes:
+        return None
+    try:
+        event_bus.publish("browser", event_type, data)
+    except event_model.InvalidEventError as error:
+        return jsonify({"status": str(error)}), 400
+    return None
+
+
 @app.route('/status', methods=['GET'])
 def status():
-    # Falls back to the just-stopped session's errors only when NO session
-    # is active - not `get_active_session_errors() or get_last_session_errors()`,
-    # which would be wrong: a currently-running session with zero errors
-    # returns [], and [] is falsy in Python, so `or` would incorrectly leak
-    # the PREVIOUS session's errors into a clean, still-running one. Checking
-    # is_session_active() explicitly avoids that.
-    if session_manager.is_session_active():
-        errors = session_manager.get_active_session_errors()
-    else:
-        errors = session_manager.get_last_session_errors()
+    snapshot = session_manager.get_status()
+    errors = snapshot["errors"]
     return jsonify({
         "status": "Server is running",
-        "sessionActive": session_manager.is_session_active(),
-        "captureMode": session_manager.get_active_capture_mode(),
+        "sessionActive": snapshot["sessionActive"],
+        "captureMode": snapshot["captureMode"],
         # Previously a session with recording failures (a step that failed
         # to write, etc.) looked identical to a healthy one from here - the
         # only trace was a backend log line nobody watching /status would see.
@@ -138,13 +162,25 @@ def start_tracking():
     try:
         session_manager.start_session(
             page_name, page_url, language, capture_mode, viewport_width, viewport_height)
+    except session_manager.SessionAlreadyRunningError as error:
+        # 409, not the 400 every other start failure gets: the request itself
+        # was fine, it just conflicts with the current state - and the body
+        # says which mode is in the way so the panel can name it, instead of
+        # showing a generic "failed to start".
+        return jsonify({"status": str(error), "activeCaptureMode": error.active_capture_mode}), 409
     except (ValueError, session_manager.SessionStartError, NotImplementedError) as error:
         return jsonify({"status": str(error)}), 400
+    except OSError as error:
+        # create_session writing the .feature file (disk full, read-only dir):
+        # without this it was an HTML 500 the extension can't parse.
+        return jsonify({"status": f"Failed to create the session files: {error}"}), 500
 
     return jsonify({"status": f"Eye tracking and voice control started in {language}"}), 200
 
 
-@app.route('/stop', methods=['GET'])
+# POST, not GET: a GET that changes state can be fired by any page with an
+# <img src> (no Origin header to check), a POST cannot.
+@app.route('/stop', methods=['POST'])
 def stop_tracking():
     try:
         session_manager.stop_session()
@@ -165,15 +201,13 @@ def tag_info():
     element_id = _as_str(data.get('id'))
     xpath = _as_str(data.get('xpath'))
 
-    if session_manager.is_session_active():
-        try:
-            event_bus.publish("browser", "click", {
-                "selector": tag_name,
-                "href": href,
-                "id": element_id,
-                "xpath": xpath})
-        except event_model.InvalidEventError as error:
-            return jsonify({"status": str(error)}), 400
+    error = _publish_browser_event("click", {
+        "selector": tag_name,
+        "href": href,
+        "id": element_id,
+        "xpath": xpath})
+    if error:
+        return error
 
     return jsonify({"status": "Tag information received"}), 200
 
@@ -196,14 +230,12 @@ def input_info():
     # same typed text twice. "all" mode is left alone: it means both
     # modalities are meant to work at once, and there's no way to tell here
     # whether a given change came from real typing or from voice.
-    if session_manager.is_session_active() and session_manager.get_active_capture_mode() != "eye_voice":
-        try:
-            event_bus.publish("browser", "input", {
-                "text": text,
-                "id": element_id,
-                "xpath": xpath})
-        except event_model.InvalidEventError as error:
-            return jsonify({"status": str(error)}), 400
+    error = _publish_browser_event("input", {
+        "text": text,
+        "id": element_id,
+        "xpath": xpath}, skip_in_modes=("eye_voice",))
+    if error:
+        return error
 
     return jsonify({"status": "Input information received"}), 200
 
@@ -222,15 +254,14 @@ def viewport_info():
     width = session_recorder.parse_viewport_dimension(data.get('width'))
     height = session_recorder.parse_viewport_dimension(data.get('height'))
 
-    if width is not None and height is not None and session_manager.is_session_active():
-        try:
-            event_bus.publish("browser", "resize", {"width": width, "height": height})
-        except event_model.InvalidEventError as error:
-            return jsonify({"status": str(error)}), 400
+    if width is not None and height is not None:
+        error = _publish_browser_event("resize", {"width": width, "height": height})
+        if error:
+            return error
 
     return jsonify({"status": "Viewport information received"}), 200
 
 
 if __name__ == '__main__':
     start_websocket_server()
-    app.run(host='0.0.0.0', port=5001)  # flask app
+    app.run(host='127.0.0.1', port=5001)  # flask app, loopback only

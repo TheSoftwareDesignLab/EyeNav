@@ -1,17 +1,35 @@
 const { Given, When, Then } = require('@cucumber/cucumber');
 
+// How long a step waits for its target to exist and be visible. Explicit
+// instead of WebdriverIO's default (5 s), which is short for the very case
+// these waits exist for: a component filled in by a slow request.
+const ELEMENT_WAIT_TIMEOUT_MS = 15000;
+
 /**
- * Resolves the element an xpath from content.js's getXPath() refers to.
- * $$ can occasionally match a decoy element before the real one (e.g. a
- * hidden duplicate some frameworks render) ahead of the one getXPath()
- * actually meant, so every xpath-based step here falls back to elements[1]
- * instead of assuming elements[0] is always correct.
+ * Picks the element an xpath refers to from a $$ result. $$ can occasionally
+ * match a decoy before the real one (e.g. a hidden duplicate some frameworks
+ * render), so this falls back to elements[1] instead of assuming elements[0]
+ * is always correct.
+ */
+function pickXpathElement(elements) {
+    return elements[0] == null ? elements[1] : elements[0];
+}
+
+/**
+ * Resolves the element an xpath from content.js's getXPath() refers to,
+ * waiting for it to appear first. $$ never waits - on an element that has
+ * not rendered yet it returns [] - so without this wait, an element filled
+ * in asynchronously made every xpath-based step fail at once with an opaque
+ * "Cannot read properties of undefined" instead of waiting for it.
  * @param {WebdriverIO.Browser} driver
  * @param {string} xpath
  */
 async function resolveXpathElement(driver, xpath) {
-    const elements = await driver.$$(xpath);
-    return elements[0] == null ? elements[1] : elements[0];
+    await driver.waitUntil(
+        async () => pickXpathElement(await driver.$$(xpath)) != null,
+        { timeout: ELEMENT_WAIT_TIMEOUT_MS, timeoutMsg: `No element found for xpath ${xpath}` }
+    );
+    return pickXpathElement(await driver.$$(xpath));
 }
 
 /**
@@ -23,8 +41,8 @@ async function resolveXpathElement(driver, xpath) {
  * @param {WebdriverIO.Element} element
  */
 async function waitUntilReady(element) {
-    await element.waitForExist();
-    return element.waitForDisplayed();
+    await element.waitForExist({ timeout: ELEMENT_WAIT_TIMEOUT_MS });
+    return element.waitForDisplayed({ timeout: ELEMENT_WAIT_TIMEOUT_MS });
 }
 
 Given('I click on tag with href {string}', async function (href) {
@@ -56,7 +74,10 @@ Given('I click on tag with xpath {string}', async function (xpath) {
 Given('I scroll until I can see the element with xpath {string}', async function (xpath) {
     const element = await resolveXpathElement(this.driver, xpath);
     await waitUntilReady(element);
-    return await element.scrollIntoView();
+    // Centered, not wdio's default (aligned to the top edge): a sticky or
+    // fixed header would sit on top of a target scrolled to the top, and the
+    // click that follows would be intercepted by it.
+    return await element.scrollIntoView({ block: 'center', inline: 'center' });
 });
 
 Given('I input {string}', async function (text) {

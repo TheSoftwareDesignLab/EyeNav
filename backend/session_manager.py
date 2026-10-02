@@ -12,6 +12,10 @@ ALLOWED_CAPTURE_MODES = {"eye_voice", "mouse_keyboard", "all"}
 # up on it and reporting it as stuck.
 THREAD_JOIN_TIMEOUT_SECONDS = 10
 
+# Name under which the logger thread appears in the {name: Thread} dicts below
+# (it isn't a capturer, so it has no CAPTURER_FACTORIES entry).
+INTERACTION_LOGGER = "interaction_logger"
+
 # Which capturers a given capture mode needs, on top of content.js's click
 # and input capture, which run unconditionally in every mode as long as a
 # session is active (see main.py's /tag-info and /input-info). mouse_keyboard
@@ -24,20 +28,43 @@ CAPTURE_MODE_CAPTURERS = {
 }
 
 
+def _guarded(name, target):
+    """
+    Wraps a capturer's entry point so an exception ends up on the session
+    instead of only killing the thread. A capturer failing after start_session
+    returned (Vosk can't load the language, no microphone permission, the
+    eye tracker raises) used to leave /status reporting a healthy running
+    session that was recording nothing, with no trace anywhere.
+    """
+    def run(session):
+        try:
+            target(session)
+        except Exception as error:
+            logger.exception("Capturer '%s' crashed", name)
+            session.add_error(f"{name} stopped unexpectedly: {error}")
+    return run
+
+
 def _eye_tracking_capturer():
     import eye_tracking
-    return {
-        "start": lambda session: threading.Thread(target=eye_tracking.start_eye_tracking, args=(session,)),
-        "stop": eye_tracking.stop_eye_tracking,
-    }
+
+    def start(session):
+        # Armed here, on the caller's thread, so a Stop can't be overwritten
+        # by the capturer thread starting late - see prepare_eye_tracking().
+        eye_tracking.prepare_eye_tracking()
+        return threading.Thread(target=_guarded("eye_tracking", eye_tracking.start_eye_tracking), args=(session,))
+
+    return {"start": start, "stop": eye_tracking.stop_eye_tracking}
 
 
 def _voice_control_capturer():
     import voice_control
-    return {
-        "start": lambda session: threading.Thread(target=voice_control.main, args=(session,)),
-        "stop": voice_control.stop_voice_control,
-    }
+
+    def start(session):
+        voice_control.prepare_voice_control()
+        return threading.Thread(target=_guarded("voice_control", voice_control.main), args=(session,))
+
+    return {"start": start, "stop": voice_control.stop_voice_control}
 
 
 # Factories, not ready-made capturers: eye_tracking/voice_control pull in
@@ -109,6 +136,18 @@ class SessionStartError(SessionError):
     pass
 
 
+class SessionAlreadyRunningError(SessionStartError):
+    """
+    Raised when a session is requested while another is already running.
+    Carries the running session's capture mode so the caller can tell the
+    user WHICH mode is in the way, instead of only "something is running".
+    """
+
+    def __init__(self, active_capture_mode):
+        super().__init__("A session is already running")
+        self.active_capture_mode = active_capture_mode
+
+
 class SessionStopError(SessionError):
     pass
 
@@ -131,8 +170,8 @@ def _snapshot_active_session():
     """
     Returns the active Session (if one is genuinely running) as a single
     local reference, instead of re-reading the _active_session global
-    multiple times across separate statements. is_session_active(),
-    get_active_capture_mode(), and get_active_session_errors() used to each
+    multiple times across separate statements. is_session_active() and
+    get_active_capture_mode() used to each
     read _active_session two or three times (once to check it's not None,
     again to read .state, again to read whatever field they needed) with no
     lock - on Flask's threaded dev server, a concurrent stop_session() could
@@ -157,23 +196,34 @@ def get_active_capture_mode():
     return session.capture_mode if session else None
 
 
-def get_active_session_errors():
+def get_status():
     """
-    Recording-time failures (e.g. a step that failed to write) accumulated
-    on the active session by interaction_logger, so main.py's /status route
-    can surface them - previously these only ever reached a log line, with
-    no way for the frontend to learn a session was silently degraded.
-    @return: list of error messages for the active session, or [] if none
+    Everything GET /status reports, derived from ONE snapshot of the active
+    session. The route used to call is_session_active(), the errors getter,
+    is_session_active() again and get_active_capture_mode() separately, each
+    taking its own snapshot - a /stop landing between two of them produced
+    combinations like sessionActive:true with captureMode:null, and the panel
+    keys its whole state on those two fields together.
+
+    Errors are the active session's while one is running (recording-time
+    failures such as a step that failed to write, accumulated by
+    interaction_logger and eye_tracking/voice_control), and the just-stopped
+    session's otherwise. That fallback is chosen by checking for an active
+    session, NOT by `active_errors or last_errors`: a running session with
+    zero errors has [] (falsy), and `or` would then leak the PREVIOUS
+    session's errors into a clean, still-running one.
+    @return: {"sessionActive": bool, "captureMode": str|None, "errors": list}
     """
     session = _snapshot_active_session()
-    return list(session.errors) if session else []
+    if session is not None:
+        return {"sessionActive": True, "captureMode": session.capture_mode, "errors": list(session.errors)}
+    return {"sessionActive": False, "captureMode": None, "errors": get_last_session_errors()}
 
 
 def get_last_session_errors():
     """
-    Errors from the most recently STOPPED session, as opposed to
-    get_active_session_errors() which only reports for a currently-running
-    one. Without this, checking /status right after clicking Stop - the
+    Errors from the most recently STOPPED session. Without this, checking
+    /status right after clicking Stop - the
     moment someone is most likely to ask "did my recording finish cleanly?"
     - always reported a clean slate regardless of what happened during
     recording, since _active_session had already been cleared to None.
@@ -194,21 +244,17 @@ def _stop_signal_fn(name):
     @param name: thread name, as used in the {name: Thread} dicts this module passes around
     @return: a zero-argument callable, or None
     """
-    if name == "interaction_logger":
+    if name == INTERACTION_LOGGER:
         return event_bus.stop
     capturer = _resolve_capturer(name)
     return capturer.get("stop") if capturer else None
 
 
-def _stop_threads(threads):
+def _stop_each(threads):
     """
-    Signals every thread in `threads` to stop and waits for each one to
-    actually exit before returning, so a caller never proceeds (e.g. lets a
-    new session start) while an old thread might still be alive - which would
-    otherwise leave it consuming from the shared event_bus queue and writing
-    into whichever session happens to be active by then.
-    @param threads: {name: Thread} of threads to stop
-    @return: names of threads still alive after the timeout (should be empty)
+    Signals each thread in `threads` to stop and waits for it to exit.
+    @param threads: {name: Thread}
+    @return: names of threads still alive after the timeout
     """
     stuck = []
 
@@ -224,6 +270,29 @@ def _stop_threads(threads):
             stuck.append(name)
 
     return stuck
+
+
+def _stop_threads(threads):
+    """
+    Signals every thread in `threads` to stop and waits for each one to
+    actually exit before returning, so a caller never proceeds (e.g. lets a
+    new session start) while an old thread might still be alive - which would
+    otherwise leave it consuming from the shared event_bus queue and writing
+    into whichever session happens to be active by then.
+
+    interaction_logger is stopped last, and only if every capturer actually
+    exited: it writes whatever the capturers publish, so stopping it while one
+    is still alive leaves that capturer publishing into a queue nobody reads,
+    and a retried stop would then leave one more stop sentinel behind. When
+    something is stuck the logger is left running, so a failed stop leaves a
+    session that still records and can simply be stopped again.
+    @param threads: {name: Thread} of threads to stop
+    @return: names of threads still alive after the timeout (should be empty)
+    """
+    stuck = _stop_each({name: thread for name, thread in threads.items() if name != INTERACTION_LOGGER})
+    if stuck:
+        return stuck
+    return _stop_each({name: thread for name, thread in threads.items() if name == INTERACTION_LOGGER})
 
 
 def start_session(page_name, page_url, language, capture_mode, viewport_width=None, viewport_height=None):
@@ -246,8 +315,9 @@ def start_session(page_name, page_url, language, capture_mode, viewport_width=No
         raise ValueError(f"Unknown capture mode: {capture_mode}")
 
     with _session_lock:
-        if is_session_active():
-            raise SessionStartError("A session is already running")
+        running = _snapshot_active_session()
+        if running is not None:
+            raise SessionAlreadyRunningError(running.capture_mode)
 
         required_capturers = CAPTURE_MODE_CAPTURERS[capture_mode]
         missing = [name for name in required_capturers if _resolve_capturer(name) is None]
@@ -256,6 +326,9 @@ def start_session(page_name, page_url, language, capture_mode, viewport_width=No
 
         session = session_recorder.create_session(
             page_name, page_url, language, capture_mode, viewport_width, viewport_height)
+
+        # Before any thread of this session exists: see event_bus.reset().
+        event_bus.reset()
 
         started_threads = {}
         try:
@@ -266,7 +339,7 @@ def start_session(page_name, page_url, language, capture_mode, viewport_width=No
 
             logging_thread = threading.Thread(target=interaction_logger.main, args=(session,), daemon=True)
             logging_thread.start()
-            started_threads["interaction_logger"] = logging_thread
+            started_threads[INTERACTION_LOGGER] = logging_thread
 
         except Exception as error:
             stuck = _stop_threads(started_threads)
