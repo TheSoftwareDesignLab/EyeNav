@@ -93,26 +93,6 @@ h1 {
     transform: scale(0.95);
 }
 
-.visualization-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background-color: #fff;
-    width: 100%;
-    max-width: 500px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-#nlp-command {
-    font-size: 20px !important;
-    font-weight: bold !important;
-    text-align: center;
-}
-
-
 .highlight {
     color: blue;
     font-weight: bold;
@@ -124,12 +104,6 @@ h2 {
     font-size: 12px;
     color: #333;
     margin-bottom: 5px;
-}
-
-.voice-commands p {
-    font-size: 14px;
-    color: #666;
-    margin-bottom: 20px;
 }
 
 .command {
@@ -153,34 +127,6 @@ h2 {
 .command p {
     font-size: 12px;
     color: #666;
-}
-
-.voice-commands table {
-    width: 100%;
-    border-spacing: 0 15px;
-}
-
-.voice-commands td {
-    padding: 5px;
-    vertical-align: middle;
-}
-
-.voice-commands img {
-    width: 30px;
-    height: auto;
-}
-
-.voice-commands h2 {
-    font-size: 14px;
-    margin-bottom: 5px;
-    margin-top: 0;
-    color: #333;
-}
-
-.voice-commands p {
-    font-size: 12px;
-    color: #666;
-    margin: 0;
 }
 
 .play-button:focus {

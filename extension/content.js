@@ -1,17 +1,11 @@
 /**
- * Check if an element is clickable
- * @param {HTMLElement} element
- * @returns {boolean}
+ * Tag names EyeNav treats as interactive: relevant for click capture
+ * (isRelevantElement below) and for attaching listeners to matching
+ * descendants when new DOM subtrees appear (mutationCallback below).
+ * @type {string[]}
  */
-function isClickable(element) {
-    return element.tagName.toLowerCase() === 'a' ||
-        element.tagName.toLowerCase() === 'button' ||
-        element.tagName.toLowerCase() === 'input' ||
-        element.tagName.toLowerCase() === 'select' ||
-        element.tagName.toLowerCase() === 'textarea' ||
-        (element.onclick || element.getAttribute('role') === 'button') ||
-        (element.href !== undefined && element.href !== '');
-}
+const INTERACTIVE_TAGS = ['a', 'button', 'input', 'select', 'textarea'];
+const INTERACTIVE_TAGS_SELECTOR = INTERACTIVE_TAGS.join(', ');
 
 /**
  * Builds an XPath 1.0 string literal for a value that may itself contain
@@ -67,18 +61,23 @@ function getXPath(element) {
  * @returns {boolean}
  */
 function isRelevantElement(element) {
-    return element.offsetWidth > 0 &&
-        element.offsetHeight > 0 &&
-        ['a', 'button', 'input', 'select', 'textarea', 'div', 'span'].includes(element.tagName.toLowerCase()) ||
-        (element.onclick || element.getAttribute('role') === 'button' || element.hasAttribute('tabindex')) ||
-        (element.href !== undefined && element.href !== '');
+    const isVisible = element.offsetWidth > 0 && element.offsetHeight > 0;
+    // Deliberately not INTERACTIVE_TAGS: div/span are included here because a
+    // visible div/span can still be a custom clickable widget, but they're
+    // excluded from INTERACTIVE_TAGS_SELECTOR since auto-attaching a listener
+    // to every div/span under a mutated node would be almost every element.
+    const isInteractiveTag = [...INTERACTIVE_TAGS, 'div', 'span'].includes(element.tagName.toLowerCase());
+    const hasClickSemantics = element.onclick || element.getAttribute('role') === 'button' || element.hasAttribute('tabindex');
+    const isLink = element.href !== undefined && element.href !== '';
+
+    return (isVisible && isInteractiveTag) || hasClickSemantics || isLink;
 }
 
 /**
  * Report a captured interaction to the backend. Every interaction type
  * (click, input, and whatever gets added later) reports the same way, so
  * this is the one place that knows about the EyeNav server's address.
- * @param {string} endpoint - path under http://localhost:5001
+ * @param {string} endpoint - path under EYENAV_BACKEND_URL (see shared/config.js)
  * @param {Object} data - the interaction's payload
  * @param {string} label - used only for the console logs below
  */
@@ -116,7 +115,7 @@ function sendToBackground(endpoint, data) {
     return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => reject(new Error('Report timed out')), REPORT_TIMEOUT_MS);
 
-        chrome.runtime.sendMessage({ type: 'EYENAV_REPORT', endpoint, data }, (response) => {
+        chrome.runtime.sendMessage({ type: EYENAV_MESSAGE_TYPES.REPORT, endpoint, data }, (response) => {
             clearTimeout(timeoutId);
 
             if (chrome.runtime.lastError) {
@@ -230,6 +229,21 @@ function handleInputCommit(event) {
 }
 
 /**
+ * Attaches the click handler to `node` itself and to every descendant that
+ * matches INTERACTIVE_TAGS_SELECTOR - shared by both branches of
+ * mutationCallback below, since a newly-added node and a node whose
+ * attributes just changed need the exact same "this node plus its
+ * interactive descendants" treatment.
+ * @param {HTMLElement} node
+ */
+function attachClickListeners(node) {
+    node.addEventListener('click', handleClick, true); // Capture phase
+    node.querySelectorAll(INTERACTIVE_TAGS_SELECTOR).forEach(child => {
+        child.addEventListener('click', handleClick, true); // Capture phase
+    });
+}
+
+/**
  * Mutation callback function for webpages that are dynamically updated.
  * This will attach click handlers to new elements that are added to the DOM.
  * @param {MutationRecord[]} mutations
@@ -248,12 +262,7 @@ function mutationCallback(mutations) {
             }
 
             if (isRelevantElement(node)) {
-                node.addEventListener('click', handleClick, true); // Attach our event handler in capture phase
-
-                // Attach to relevant child elements as well
-                node.querySelectorAll('a, button, input, select, textarea').forEach(child => {
-                    child.addEventListener('click', handleClick, true); // In capture phase
-                });
+                attachClickListeners(node);
             }
         });
 
@@ -274,11 +283,7 @@ function mutationCallback(mutations) {
             }
 
             if (!node.hasAttribute('hidden') && node.style.display !== 'none') {
-                node.addEventListener('click', handleClick, true);  // Capture phase to avoid interfering with bubbling
-
-                node.querySelectorAll('a, button, input, select, textarea').forEach(child => {
-                    child.addEventListener('click', handleClick, true); // Attach to relevant children in capture phase
-                });
+                attachClickListeners(node);
             }
         }
     });

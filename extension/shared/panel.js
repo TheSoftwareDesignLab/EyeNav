@@ -1,4 +1,91 @@
 /**
+ * Loads a surface's locale strings, falling back to English if the
+ * detected language has no locale file of its own. Shared by
+ * initEyeNavPanel below and popup.js's mode chooser, so there's one
+ * implementation of "load a locale JSON with a fallback" instead of two.
+ * @param {string} splitLang - two-letter language code (e.g. 'en', 'es')
+ * @returns {Promise<Object>} the loaded (or fallback) strings
+ */
+function loadEyeNavLocale(splitLang) {
+    return fetch(`../locales/${splitLang}.json`)
+        .then(response => {
+            if (!response.ok) throw new Error('Locale not found');
+            return response.json();
+        })
+        .catch(() => {
+            console.warn('Falling back to English locale');
+            return fetch('../locales/en.json').then(res => res.json());
+        });
+}
+
+/**
+ * Locale keys whose value intentionally contains markup (currently just the
+ * <strong> tags in the side panel's "how to type" instructions) and must be
+ * rendered as HTML. Every other key is treated as plain text - the safer
+ * default, and what every other translated label actually needs; only this
+ * key needs anything else.
+ * @type {Set<string>}
+ */
+const EYENAV_RICH_TEXT_KEYS = new Set(['eyenav-input-desc']);
+
+/**
+ * Maps a two-letter browser language code to the voice-recognition language
+ * code commands.json/voice_control.py expect. Any code with no special-cased
+ * entry here is passed through as-is (e.g. 'fr' stays 'fr').
+ * @type {Object<string, string>}
+ */
+const EYENAV_VOICE_LANGUAGE_MAP = { en: 'en-us' };
+
+/**
+ * Sets every element whose id matches a locale key to that key's string.
+ * Shared by initEyeNavPanel and popup.js's mode chooser. An element whose
+ * id doesn't correspond one-to-one with a locale key (e.g. popup.js has
+ * three different title elements that all want the single "eyenav-title"
+ * string) is left for the caller to assign directly.
+ *
+ * A falsy value (missing key, or an explicit empty-string placeholder in an
+ * incomplete locale file) is skipped rather than applied - this is the one
+ * place that protection needs to live, since it's the actual assignment
+ * point both initEyeNavPanel's own locale pass AND popup.js's mode-chooser
+ * pass go through; relying on each *caller* to pre-filter (as
+ * mergeEyeNavStrings does for popup.js's defaults) left initEyeNavPanel's
+ * own pass - which doesn't go through mergeEyeNavStrings at all - unprotected.
+ * @param {Object} strings
+ */
+function applyEyeNavTranslations(strings) {
+    for (const key in strings) {
+        if (!strings[key]) continue;
+        const element = document.getElementById(key);
+        if (!element) continue;
+        if (EYENAV_RICH_TEXT_KEYS.has(key)) {
+            element.innerHTML = strings[key];
+        } else {
+            element.textContent = strings[key];
+        }
+    }
+}
+
+/**
+ * Merges loaded locale strings over a set of hardcoded defaults, keeping the
+ * default for any key the locale left falsy (missing, or an empty-string
+ * placeholder) instead of letting it through - a plain object spread would
+ * let an empty string in the loaded locale silently blank out an element
+ * that would otherwise show readable fallback text.
+ * @param {Object} defaults
+ * @param {Object} loaded
+ * @returns {Object}
+ */
+function mergeEyeNavStrings(defaults, loaded) {
+    const merged = { ...defaults };
+    for (const key in loaded) {
+        if (loaded[key]) {
+            merged[key] = loaded[key];
+        }
+    }
+    return merged;
+}
+
+/**
  * Shared control-panel logic used by both the popup (mouse_keyboard) and the
  * side panel (eye_voice) surfaces: translations, session start/stop, server
  * status, and the live WebSocket voice-command visualization.
@@ -13,28 +100,28 @@ function initEyeNavPanel(captureMode, knownStatus) {
     console.log('EYENAV: User language detected:', userLang);
 
     const splitLang = userLang.split('-')[0];
-    const language = splitLang === 'en' ? 'en-us' : (splitLang === 'es' ? 'es' : splitLang);
-    const localePath = `../locales/${splitLang}.json`;
+    const language = EYENAV_VOICE_LANGUAGE_MAP[splitLang] || splitLang;
     const commandsPath = '../commands.json';
 
-    // DOM elements
+    // DOM elements. alert-below-button and play-button are required on every
+    // surface this file drives - failing fast here beats a confusing
+    // "Cannot set properties of null" several calls deep the first time
+    // either is renamed or missing. nlp-command is genuinely optional (the
+    // mouse_keyboard popup has no live voice-command visualization to show),
+    // so it alone is allowed to be null and is checked at each use below.
     const alertBelowButton = document.getElementById('alert-below-button');
     const voiceCommand = document.getElementById('nlp-command');
     const playButton = document.getElementById('play-button');
+
+    if (!alertBelowButton || !playButton) {
+        throw new Error('EyeNav panel.js: this surface is missing #alert-below-button or #play-button');
+    }
 
     let strings = {};
     let language_config = {};
 
     // Promises
-    const localePromise = fetch(localePath)
-        .then(response => {
-            if (!response.ok) throw new Error('Locale not found');
-            return response.json();
-        })
-        .catch(() => {
-            console.warn('Falling back to English locale');
-            return fetch('../locales/en.json').then(res => res.json());
-        });
+    const localePromise = loadEyeNavLocale(splitLang);
 
     const commandsPromise = fetch(commandsPath)
         .then(response => {
@@ -55,20 +142,17 @@ function initEyeNavPanel(captureMode, knownStatus) {
             voiceCommand.innerHTML = strings['initial-nlp-command'] || "Recognized voice commands will appear here";
         }
 
-        applyTranslations(strings);
-        setupWebSocket();
+        applyEyeNavTranslations(strings);
+        // Only the surfaces that actually have somewhere to show a live
+        // voice command (the side panel) need the WebSocket at all - opening
+        // and auto-retrying it for a surface with no visualization to update
+        // (the mouse_keyboard popup) would connect and reconnect for nothing.
+        if (voiceCommand) {
+            setupWebSocket();
+        }
         disablePlayButton();
         checkServerStatus();
     });
-
-    function applyTranslations(strings) {
-        for (const key in strings) {
-            const element = document.getElementById(key);
-            if (element) {
-                element.innerHTML = strings[key];
-            }
-        }
-    }
 
     // Function to disable the play button
     function disablePlayButton() {
@@ -79,7 +163,19 @@ function initEyeNavPanel(captureMode, knownStatus) {
     // Function to enable the play button
     function enablePlayButton() {
         playButton.disabled = false;
-        playButton.style.backgroundColor = playButton.classList.contains('play') ? 'black' : 'black';
+        playButton.style.backgroundColor = 'black';
+    }
+
+    /**
+     * Sets the alert-below-button text, and optionally its color. Centralizes
+     * the "text + color" pair every session/status transition below needs to
+     * set together, instead of each repeating both lines separately.
+     * @param {string} text
+     * @param {string} [color]
+     */
+    function setAlert(text, color) {
+        alertBelowButton.textContent = text;
+        if (color) alertBelowButton.style.color = color;
     }
 
     // Control functions
@@ -144,7 +240,7 @@ function initEyeNavPanel(captureMode, knownStatus) {
 
                 console.log('EYENAV: Starting session with page details:', pageDetails);
 
-                fetch('http://localhost:5001/start', {
+                fetch(`${EYENAV_BACKEND_URL}/start`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -157,12 +253,12 @@ function initEyeNavPanel(captureMode, knownStatus) {
                         if (!ok) {
                             throw new Error(data.status || 'Failed to start session');
                         }
-                        alertBelowButton.textContent = strings['sessionStarted'] || 'Session started.';
+                        setAlert(strings['sessionStarted'] || 'Session started');
                         setStoppableState();
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        alertBelowButton.textContent = strings['failedToStart'] || 'Failed to start session. Ensure the server is running.';
+                        setAlert(strings['failedToStart'] || 'Failed to start session');
                     });
             });
         });
@@ -172,18 +268,18 @@ function initEyeNavPanel(captureMode, knownStatus) {
      * Stop the orchestrated session
      */
     function stopSession() {
-        fetch('http://localhost:5001/stop')
+        fetch(`${EYENAV_BACKEND_URL}/stop`)
             .then(response => response.json().then(data => ({ ok: response.ok, data })))
             .then(({ ok, data }) => {
                 if (!ok) {
                     throw new Error(data.status || 'Failed to stop session');
                 }
-                alertBelowButton.textContent = strings['sessionStopped'] || 'Session stopped.';
+                setAlert(strings['sessionStopped'] || 'Session stopped');
                 setStartableState();
             })
             .catch(error => {
                 console.error('Error:', error);
-                alertBelowButton.textContent = strings['failedToStop'] || 'Failed to stop session.';
+                setAlert(strings['failedToStop'] || 'Failed to stop session');
             });
     }
 
@@ -200,7 +296,7 @@ function initEyeNavPanel(captureMode, knownStatus) {
             return;
         }
 
-        fetch('http://localhost:5001/status')
+        fetch(`${EYENAV_BACKEND_URL}/status`)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Server not reachable');
@@ -210,8 +306,7 @@ function initEyeNavPanel(captureMode, knownStatus) {
             .then(applyStatus)
             .catch(error => {
                 console.error('Error:', error);
-                alertBelowButton.textContent = strings['eyenav-ensure-server-running'] || "Ensure the server is running";
-                alertBelowButton.style.color = 'red';
+                setAlert(strings['eyenav-ensure-server-running'] || "Ensure the server is running", 'red');
                 disablePlayButton();
             });
     }
@@ -219,11 +314,10 @@ function initEyeNavPanel(captureMode, knownStatus) {
     function applyStatus(data) {
         enablePlayButton();
         if (data.sessionActive) {
-            alertBelowButton.textContent = strings['sessionStarted'] || 'Session started.';
+            setAlert(strings['sessionStarted'] || 'Session started');
             setStoppableState();
         } else {
-            alertBelowButton.textContent = strings['eyenav-start-message'] || "Start an orchestrated session";
-            alertBelowButton.style.color = 'black';
+            setAlert(strings['eyenav-start-message'] || "Start an orchestrated session", 'black');
             setStartableState();
         }
     }
@@ -234,10 +328,10 @@ function initEyeNavPanel(captureMode, knownStatus) {
     function setupWebSocket() {
         console.log('EYENAV: Setting up WebSocket connection');
         let socket;
-        let retryInterval = 5000;
+        const retryInterval = 5000;
 
         function connectWebSocket() {
-            socket = new WebSocket('ws://localhost:5002/');
+            socket = new WebSocket(EYENAV_WEBSOCKET_URL);
             console.log('EYENAV: WebSocket connection created');
 
             socket.onopen = function (event) {

@@ -1,9 +1,16 @@
+import logging
 import threading
 import interaction_logger
 import session_recorder
 import event_bus
 
+logger = logging.getLogger(__name__)
+
 ALLOWED_CAPTURE_MODES = {"eye_voice", "mouse_keyboard", "all"}
+
+# How long _stop_threads waits for each capturer thread to exit before giving
+# up on it and reporting it as stuck.
+THREAD_JOIN_TIMEOUT_SECONDS = 10
 
 # Which capturers a given capture mode needs, on top of content.js's click
 # and input capture, which run unconditionally in every mode as long as a
@@ -20,7 +27,7 @@ CAPTURE_MODE_CAPTURERS = {
 def _eye_tracking_capturer():
     import eye_tracking
     return {
-        "start": lambda session: threading.Thread(target=eye_tracking.start_eye_tracking),
+        "start": lambda session: threading.Thread(target=eye_tracking.start_eye_tracking, args=(session,)),
         "stop": eye_tracking.stop_eye_tracking,
     }
 
@@ -69,11 +76,29 @@ def _resolve_capturer(name):
         # crashing start_session. Not cached: if the missing dependency gets
         # installed without restarting the backend, the next attempt should
         # actually retry the import instead of reusing this failure forever.
-        print(f"INFO: Capturer '{name}' unavailable: {error}")
+        logger.warning("Capturer '%s' unavailable: %s", name, error)
         return None
 
     _capturer_cache[name] = capturer
     return capturer
+
+
+def reset_capturer_cache():
+    """
+    Clears the lazily-resolved capturer cache. Exists mainly as a test seam:
+    _resolve_capturer's cache is otherwise a bare module-level dict with no
+    public reset, so a test exercising the capture-mode branching (the one
+    part of this module that needs no real hardware) has to reach past the
+    public API into session_manager._capturer_cache directly and remember to
+    clean up after itself - this gives it a documented, public way to do that.
+
+    Guarded by _session_lock like every other access to _capturer_cache
+    (start_session, _resolve_capturer, _stop_threads) - without this, a
+    reset racing a concurrent start_session's unlocked-relative-to-this-one
+    cache population/read could observe a half-cleared cache.
+    """
+    with _session_lock:
+        _capturer_cache.clear()
 
 
 class SessionError(Exception):
@@ -89,6 +114,9 @@ class SessionStopError(SessionError):
 
 _active_session = None
 _active_threads = {}
+# The most recently STOPPED session (or None, before any session has run) -
+# see get_last_session_errors().
+_last_stopped_session = None
 # Guards the read-check-then-write around _active_session/_active_threads in
 # start_session/stop_session. Flask's dev server is threaded by default, so
 # without this, two overlapping /start requests could both observe
@@ -99,47 +127,101 @@ _active_threads = {}
 _session_lock = threading.Lock()
 
 
+def _snapshot_active_session():
+    """
+    Returns the active Session (if one is genuinely running) as a single
+    local reference, instead of re-reading the _active_session global
+    multiple times across separate statements. is_session_active(),
+    get_active_capture_mode(), and get_active_session_errors() used to each
+    read _active_session two or three times (once to check it's not None,
+    again to read .state, again to read whatever field they needed) with no
+    lock - on Flask's threaded dev server, a concurrent stop_session() could
+    set _active_session = None in the gap between two of those reads, and
+    the next one would raise AttributeError: 'NoneType' object has no
+    attribute '...', turning a routine GET /status into an unhandled 500.
+    Taking one snapshot up front closes that window: once we have a
+    reference to the Session object, it stays a valid object regardless of
+    what the _active_session global is reassigned to afterward.
+    @return: the active Session, or None if no session is running
+    """
+    session = _active_session
+    return session if session is not None and session.state == "running" else None
+
+
 def is_session_active():
-    return _active_session is not None and _active_session.state == "running"
+    return _snapshot_active_session() is not None
 
 
 def get_active_capture_mode():
-    return _active_session.capture_mode if is_session_active() else None
+    session = _snapshot_active_session()
+    return session.capture_mode if session else None
+
+
+def get_active_session_errors():
+    """
+    Recording-time failures (e.g. a step that failed to write) accumulated
+    on the active session by interaction_logger, so main.py's /status route
+    can surface them - previously these only ever reached a log line, with
+    no way for the frontend to learn a session was silently degraded.
+    @return: list of error messages for the active session, or [] if none
+    """
+    session = _snapshot_active_session()
+    return list(session.errors) if session else []
+
+
+def get_last_session_errors():
+    """
+    Errors from the most recently STOPPED session, as opposed to
+    get_active_session_errors() which only reports for a currently-running
+    one. Without this, checking /status right after clicking Stop - the
+    moment someone is most likely to ask "did my recording finish cleanly?"
+    - always reported a clean slate regardless of what happened during
+    recording, since _active_session had already been cleared to None.
+    @return: list of error messages for the last stopped session, or [] if
+        no session has stopped yet
+    """
+    return list(_last_stopped_session.errors) if _last_stopped_session else []
+
+
+def _stop_signal_fn(name):
+    """
+    Returns the function that signals thread `name` to stop, or None if
+    nothing needs to be called (it exits on its own once joined).
+    interaction_logger has no entry in CAPTURER_FACTORIES: it's signalled by
+    unblocking its consume() call via event_bus.stop(), not a capturer's own
+    stop function, so it's handled here as the one non-capturer case instead
+    of the loop below needing to know about it at all.
+    @param name: thread name, as used in the {name: Thread} dicts this module passes around
+    @return: a zero-argument callable, or None
+    """
+    if name == "interaction_logger":
+        return event_bus.stop
+    capturer = _resolve_capturer(name)
+    return capturer.get("stop") if capturer else None
 
 
 def _stop_threads(threads):
     """
-    Signals every capturer thread in `threads` to stop and waits for each one
-    to actually exit before returning, so a caller never proceeds (e.g. lets
-    a new session start) while an old thread might still be alive - which
-    would otherwise leave it consuming from the shared event_bus queue and
-    writing into whichever session happens to be active by then.
-    interaction_logger has no entry in CAPTURER_FACTORIES: it's signalled by
-    unblocking its consume() call via event_bus.stop(), not a stop function.
+    Signals every thread in `threads` to stop and waits for each one to
+    actually exit before returning, so a caller never proceeds (e.g. lets a
+    new session start) while an old thread might still be alive - which would
+    otherwise leave it consuming from the shared event_bus queue and writing
+    into whichever session happens to be active by then.
     @param threads: {name: Thread} of threads to stop
     @return: names of threads still alive after the timeout (should be empty)
     """
     stuck = []
 
     for name, thread in threads.items():
-        if name == "interaction_logger":
-            continue
-        capturer = _resolve_capturer(name)
-        stop_fn = capturer.get("stop") if capturer else None
+        stop_fn = _stop_signal_fn(name)
         if stop_fn:
             try:
                 stop_fn()
-            except Exception:
-                pass
-        thread.join(timeout=10)
+            except Exception as error:
+                logger.warning("Capturer '%s' failed to stop cleanly: %s", name, error)
+        thread.join(timeout=THREAD_JOIN_TIMEOUT_SECONDS)
         if thread.is_alive():
             stuck.append(name)
-
-    if "interaction_logger" in threads:
-        event_bus.stop()
-        threads["interaction_logger"].join(timeout=10)
-        if threads["interaction_logger"].is_alive():
-            stuck.append("interaction_logger")
 
     return stuck
 
@@ -193,7 +275,7 @@ def start_session(page_name, page_url, language, capture_mode, viewport_width=No
                 message += f" (also timed out stopping: {', '.join(stuck)})"
             raise SessionStartError(message) from error
 
-        session.state = "running"
+        session.set_state("running")
         _active_session = session
         _active_threads = started_threads
 
@@ -205,7 +287,7 @@ def stop_session():
     Stops the active session's capturers and marks it as stopped.
     @return: the stopped Session
     """
-    global _active_session, _active_threads
+    global _active_session, _active_threads, _last_stopped_session
 
     with _session_lock:
         if not is_session_active():
@@ -216,8 +298,9 @@ def stop_session():
             raise SessionStopError(f"Timed out waiting for: {', '.join(stuck)}")
 
         stopped_session = _active_session
-        stopped_session.state = "stopped"
+        stopped_session.set_state("stopped")
 
+        _last_stopped_session = stopped_session
         _active_session = None
         _active_threads = {}
 

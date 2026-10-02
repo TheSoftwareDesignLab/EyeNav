@@ -9,18 +9,18 @@ _queue = queue.Queue()
 _STOP = object()
 
 
-def publish(source, type, data):
+def publish(source, event_type, data):
     """
     Validates and enqueues an event, in the order it's published. Raises
     InvalidEventError instead of queuing anything that doesn't match the
     common event schema, so capturers can publish without knowing who (if
     anyone) is consuming, and a malformed event never reaches a consumer.
     @param source: where the event came from (see event_model.ALLOWED_SOURCES)
-    @param type: kind of event (see event_model.ALLOWED_TYPES_BY_SOURCE)
+    @param event_type: kind of event (see event_model.ALLOWED_TYPES_BY_SOURCE)
     @param data: source-specific payload
     @return: the Event that was queued
     """
-    event = event_model.build_event(source, type, data)
+    event = event_model.build_event(source, event_type, data)
     _queue.put(event)
     return event
 

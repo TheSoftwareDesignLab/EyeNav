@@ -1,7 +1,10 @@
 import json
+import logging
 
 import event_bus
 import feature_writer
+
+logger = logging.getLogger(__name__)
 
 
 def log_step(session, event):
@@ -23,6 +26,23 @@ def log_event(session, event):
             f.write(json.dumps(event.to_dict()) + "\n")
 
 
+def _log_and_record_error(session, action, target, error):
+    """
+    Logs a failed logging attempt and records it on the session - logging
+    alone left this invisible outside the backend's own log output, since
+    GET /status had no way to tell a session was silently degraded.
+    Shared by both call sites in main() below so the "build a message, log
+    it, record it on the session" shape stays in one place.
+    @param session: the session_recorder.Session the failure happened for
+    @param action: short description of what was being attempted (e.g. "event")
+    @param target: the file/resource that couldn't be written to
+    @param error: the exception that was raised
+    """
+    message = f"Error logging {action} to {target}: {error}"
+    logger.error(message)
+    session.add_error(message)
+
+
 def main(session):
     """
     Consumes events from the event bus and logs them for the given session,
@@ -34,14 +54,14 @@ def main(session):
         if event_bus.is_stop_signal(event):
             break
 
-        print(f"INFO: Logging event {event}")
+        logger.info("Logging event %s", event)
 
         try:
             log_event(session, event)
-        except Exception as e:
-            print(f"INFO: Error logging event to {session.events_file}: {e}")
+        except Exception as error:
+            _log_and_record_error(session, "event", session.events_file, error)
 
         try:
             log_step(session, event)
-        except Exception as e:
-            print(f"INFO: Error logging step to {session.test_file}: {e}")
+        except Exception as error:
+            _log_and_record_error(session, "step", session.test_file, error)

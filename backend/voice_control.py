@@ -5,11 +5,14 @@ import os
 import queue
 import sounddevice as sd
 import json
+import logging
 import time
 from vosk import Model, KaldiRecognizer
 from websocket_server import message_queue
 import event_bus
 from threading import Lock
+
+logger = logging.getLogger(__name__)
 
 # Data structures
 command_to_execute = None 
@@ -22,23 +25,26 @@ current_language = "en-us"
 language_config = {}
 _transcription_file = None
 
-def load_language_config(language_code):
+def load_language_config(language_code, session=None):
     global language_config
     config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "commands.json")
     with open(config_path, "r", encoding="utf-8") as f:
         all_configs = json.load(f)
         language_config = all_configs.get(language_code, {})
         if not language_config:
-            print(f"WARNING: Language config for {language_code} not found. Falling back to en-us.")
+            message = f"Language config for {language_code} not found. Falling back to en-us."
+            logger.warning(message)
+            if session:
+                session.add_error(message)
             language_config = all_configs["en-us"]
 
-def set_voice_language(language_code):
+def set_voice_language(language_code, session=None):
     global model, recognizer, current_language
     with model_lock:
         current_language = language_code
         model = Model(lang=language_code)
         recognizer = KaldiRecognizer(model, 16000)
-        load_language_config(language_code)
+        load_language_config(language_code, session)
 
 
 def get_current_language():
@@ -58,7 +64,7 @@ def log_transcription(text):
         f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {text}\n")
 
 
-def log_interaction(interaction, *args, **kwargs):
+def publish_interaction(interaction, *args, **kwargs):
     """
     Publishes a voice-driven interaction as a common event.
     @param interaction: The event type (input, enter, back, forward or go)
@@ -108,17 +114,17 @@ def execute_command(command):
             is_typing_mode = False
             
             if typed_text_buffer.strip():
-                log_interaction("input", typed_text_buffer.strip())
+                publish_interaction("input", typed_text_buffer.strip())
                 typed_text_buffer = ""
             pyautogui.press("enter")
-            log_interaction("enter")
+            publish_interaction("enter")
             return
         
         elif command in language_config.get("control_words", []):
             is_typing_mode = False
             
             if typed_text_buffer.strip():
-                log_interaction("input", typed_text_buffer.strip())
+                publish_interaction("input", typed_text_buffer.strip())
                 typed_text_buffer = ""
             
             if command == language_config.get("click"):
@@ -130,8 +136,8 @@ def execute_command(command):
         filtered_words = [word for word in words if word not in language_config.get("control_words", [])]
         if filtered_words:
             typed_text = ' '.join(filtered_words)
-            typed_text_buffer += ' ' + typed_text 
-            type(' ' + typed_text)
+            typed_text_buffer += ' ' + typed_text
+            _type_via_clipboard(' ' + typed_text)
         return
     
     # Start typing mode
@@ -144,12 +150,12 @@ def execute_command(command):
     if language_config.get("go") in words:
         if language_config.get("back") in words:
             pyautogui.hotkey('command', '[')
-            log_interaction("back")
+            publish_interaction("back")
             print("INFO: Going back")
             return
         elif language_config.get("forward") in words:
             pyautogui.hotkey('command', ']')
-            log_interaction("forward")
+            publish_interaction("forward")
             print("INFO: Going forward")
             return
 
@@ -159,18 +165,18 @@ def execute_command(command):
                 print("INFO: No valid direction found")
                 return
             pyautogui.scroll(10 * direction)
-            log_interaction(f"go", direction, 10)
+            publish_interaction("go", direction, 10)
         except (ValueError, IndexError):
             print("INFO: Invalid scroll command")
         return
 
     if language_config.get("back") in words:
         pyautogui.hotkey('command', '[')
-        log_interaction("back")
+        publish_interaction("back")
         print("INFO: Going back")
     elif language_config.get("forward") in words:
         pyautogui.hotkey('command', ']')
-        log_interaction("forward")
+        publish_interaction("forward")
         print("INFO: Going forward")
     
 
@@ -178,11 +184,11 @@ def execute_command(command):
         pyautogui.click()
         print("INFO: Mouse click performed")
 
-def type(text: str):
+def _type_via_clipboard(text: str):
     """
     Workaround for pyautogui.write to avoid issues with special characters
     @param text: text to type
-    """    
+    """
     pyperclip.copy(text)
     if platform.system() == "Darwin":
         pyautogui.hotkey("command", "v")
@@ -232,7 +238,7 @@ def main(session):
     global _transcription_file
     _transcription_file = session.transcription_file
 
-    set_voice_language(session.language)
+    set_voice_language(session.language, session)
     print(f"INFO: Starting voice control in {session.language}...")
 
     global is_voice_recognition_active

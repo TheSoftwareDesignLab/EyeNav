@@ -1,3 +1,7 @@
+// Shared constants (backend URL, the EYENAV_REPORT message-type string)
+// this file and content.js both need to agree on - see shared/config.js.
+importScripts('shared/config.js');
+
 // chrome.sidePanel.setPanelBehavior persists per extension independently of
 // this code - an earlier version of this extension set openPanelOnActionClick
 // to true, and removing that code doesn't undo it. This explicitly resets it
@@ -16,10 +20,8 @@ chrome.sidePanel
 // background service worker runs in the extension's own context instead
 // (not tied to any page's origin), which isn't subject to that restriction,
 // so it makes the actual request on content.js's behalf.
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || message.type !== 'EYENAV_REPORT') return false;
-
-  fetch(`http://localhost:5001${message.endpoint}`, {
+function relayReportToBackend(message, sendResponse) {
+  fetch(`${EYENAV_BACKEND_URL}${message.endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(message.data),
@@ -27,6 +29,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
     .then(({ ok, data }) => sendResponse({ success: true, ok, data }))
     .catch((error) => sendResponse({ success: false, error: String(error && error.message || error) }));
+}
 
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== EYENAV_MESSAGE_TYPES.REPORT) return false;
+
+  relayReportToBackend(message, sendResponse);
   return true; // keep the message channel open for the async sendResponse above
 });

@@ -1,3 +1,19 @@
+// Fallback strings for the keys this file applies before the DOM is fully
+// translated, kept separate from panel.js's DEFAULTS since each surface's
+// chooser/notice text is specific to it. Merged under whatever the locale
+// file actually provides (see below), so a locale missing one of these
+// keys degrades to English for just that key instead of an empty element -
+// the same guarantee the old hand-written `strings[key] || 'fallback'`
+// lines gave per element, now expressed once instead of per element.
+const POPUP_DEFAULT_STRINGS = {
+    'eyenav-choose-mode': 'Hi! How would you like to interact today?',
+    'eyenav-mode-eye-voice-title': 'Eye tracking + Voice',
+    'eyenav-mode-eye-voice-subtitle': 'For hands-free use',
+    'eyenav-mode-mouse-keyboard-title': 'Mouse + Keyboard',
+    'eyenav-mode-mouse-keyboard-subtitle': 'For precise navigation',
+    'eyenav-open-side-panel': 'Open side panel',
+};
+
 document.addEventListener('DOMContentLoaded', function () {
     const userLang = navigator.language || 'en';
     document.documentElement.setAttribute('lang', userLang);
@@ -9,28 +25,20 @@ document.addEventListener('DOMContentLoaded', function () {
     const eyeVoiceButton = document.getElementById('mode-eye-voice');
     const mouseKeyboardButton = document.getElementById('mode-mouse-keyboard');
     const openSidePanelButton = document.getElementById('open-side-panel-button');
-    const chooseModeText = document.getElementById('eyenav-choose-mode');
     const eyeVoiceActiveText = document.getElementById('eyenav-eye-voice-active');
     const modeError = document.getElementById('mode-error');
-    const eyeVoiceTitle = document.getElementById('eyenav-mode-eye-voice-title');
-    const eyeVoiceSubtitle = document.getElementById('eyenav-mode-eye-voice-subtitle');
-    const mouseKeyboardTitle = document.getElementById('eyenav-mode-mouse-keyboard-title');
-    const mouseKeyboardSubtitle = document.getElementById('eyenav-mode-mouse-keyboard-subtitle');
-    const openSidePanelTitle = document.getElementById('eyenav-open-side-panel');
     const modeChooserTitle = document.getElementById('mode-chooser-title');
     const eyeVoiceNoticeTitle = document.getElementById('eye-voice-notice-title');
     const panelContentTitle = document.getElementById('panel-content-title');
 
     let strings = {};
 
-    const localePromise = fetch(`../locales/${splitLang}.json`)
-        .then(response => {
-            if (!response.ok) throw new Error('Locale not found');
-            return response.json();
-        })
-        .catch(() => fetch('../locales/en.json').then(res => res.json()));
+    // Shared with panel.js's initEyeNavPanel (see shared/panel.js) instead
+    // of each reimplementing its own fetch-with-fallback and per-element
+    // translation pass.
+    const localePromise = loadEyeNavLocale(splitLang);
 
-    const statusPromise = fetch('http://localhost:5001/status')
+    const statusPromise = fetch(`${EYENAV_BACKEND_URL}/status`)
         .then(response => response.json())
         .catch(() => null); // server unreachable - let the chooser show as usual
 
@@ -43,7 +51,19 @@ document.addEventListener('DOMContentLoaded', function () {
         modeChooser.hidden = true;
         eyeVoiceNotice.hidden = true;
         panelContent.hidden = false;
-        initEyeNavPanel(captureMode, knownStatus);
+        try {
+            // initEyeNavPanel throws if this surface is missing a required
+            // element - without this try/catch, that throw happens inside
+            // an un-caught Promise.all(...).then() callback (see below) on
+            // the status-driven auto-resume path, becoming a silent
+            // unhandled promise rejection instead of a visible error.
+            initEyeNavPanel(captureMode, knownStatus);
+        } catch (error) {
+            console.error('Error initializing panel:', error);
+            modeError.textContent = strings['failedToStart'] || 'Failed to start session';
+            modeError.hidden = false;
+            return;
+        }
         document.getElementById('play-button').focus();
     }
 
@@ -77,16 +97,25 @@ document.addEventListener('DOMContentLoaded', function () {
     // Wait for translations AND status together, so whichever view we land
     // on (chooser, notice, or panel) never briefly renders with blank text.
     Promise.all([localePromise, statusPromise]).then(([localeStrings, status]) => {
-        strings = localeStrings;
-        modeChooserTitle.textContent = strings['eyenav-title'] || 'EyeNav';
-        eyeVoiceNoticeTitle.textContent = strings['eyenav-title'] || 'EyeNav';
-        panelContentTitle.textContent = strings['eyenav-title'] || 'EyeNav';
-        chooseModeText.textContent = strings['eyenav-choose-mode'] || 'Hi! How would you like to interact today?';
-        eyeVoiceTitle.textContent = strings['eyenav-mode-eye-voice-title'] || 'Eye tracking + Voice';
-        eyeVoiceSubtitle.textContent = strings['eyenav-mode-eye-voice-subtitle'] || 'For hands-free use';
-        mouseKeyboardTitle.textContent = strings['eyenav-mode-mouse-keyboard-title'] || 'Mouse + Keyboard';
-        mouseKeyboardSubtitle.textContent = strings['eyenav-mode-mouse-keyboard-subtitle'] || 'For precise navigation';
-        openSidePanelTitle.textContent = strings['eyenav-open-side-panel'] || 'Open side panel';
+        // mergeEyeNavStrings (shared/panel.js), not a plain spread: keeps a
+        // default when the locale's own value for that key is falsy (missing,
+        // or an empty-string placeholder), instead of letting an empty
+        // string through and silently blanking the element.
+        strings = mergeEyeNavStrings(POPUP_DEFAULT_STRINGS, localeStrings);
+
+        // These three elements all want the single "eyenav-title" string,
+        // so they can't be handled by applyEyeNavTranslations's generic
+        // id-matches-key pass below - that only works one-key-to-one-id.
+        const title = strings['eyenav-title'] || 'EyeNav';
+        modeChooserTitle.textContent = title;
+        eyeVoiceNoticeTitle.textContent = title;
+        panelContentTitle.textContent = title;
+
+        // Shared with panel.js's initEyeNavPanel: everything else here has
+        // an element id matching its locale key one-to-one, so one generic
+        // pass replaces the nine individual `el.textContent = strings[key]
+        // || 'fallback'` lines this file used to duplicate that logic with.
+        applyEyeNavTranslations(strings);
 
         // If a session is already running, don't show the chooser.
         // mouse_keyboard sessions are driven from here, so reveal the

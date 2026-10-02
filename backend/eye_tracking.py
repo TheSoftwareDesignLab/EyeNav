@@ -2,7 +2,10 @@ import tobii_research as tr
 import pyautogui
 import time
 import math
+import logging
 from collections import deque
+
+logger = logging.getLogger(__name__)
 
 global_gaze_data = None
 previous_position = None
@@ -33,12 +36,14 @@ def distance(point1, point2):
     """Helper function to calculate the distance between two points."""
     return math.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
 
-def track_gaze():
+def track_gaze(session):
     global previous_position, is_tracking, my_eyetracker, gaze_buffer
 
     found_eyetrackers = tr.find_all_eyetrackers()
     if len(found_eyetrackers) == 0:
-        print("INFO: No eye trackers found.")
+        message = "No eye trackers found."
+        logger.warning(message)
+        session.add_error(message)
         return
 
     my_eyetracker = found_eyetrackers[0]
@@ -69,10 +74,10 @@ def track_gaze():
     if my_eyetracker:
         unsubscribe_from_gaze_data(my_eyetracker)
 
-def start_eye_tracking():
+def start_eye_tracking(session):
     global is_tracking
     is_tracking = True
-    track_gaze()
+    track_gaze(session)
 
 def stop_eye_tracking():
     global is_tracking
