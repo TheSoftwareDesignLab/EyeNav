@@ -19,15 +19,15 @@ PyAutoGUI==0.9.54
 pycparser==2.23
 PyGetWindow==0.0.9
 PyMsgBox==2.0.1
-pyobjc-core==12.2.2
-pyobjc-framework-Cocoa==12.2.2
-pyobjc-framework-Quartz==12.2.2
+pyobjc-core==12.2.2; sys_platform == "darwin"
+pyobjc-framework-Cocoa==12.2.2; sys_platform == "darwin"
+pyobjc-framework-Quartz==12.2.2; sys_platform == "darwin"
 pyperclip==1.11.0
 PyRect==0.2.0
 PyScreeze==1.0.1
 pytweening==1.2.0
 requests==2.32.5
-rubicon-objc==0.5.2
+rubicon-objc==0.5.2; sys_platform == "darwin"
 sounddevice==0.5.3
 srt==3.5.3
 tobii-research==2.1.0

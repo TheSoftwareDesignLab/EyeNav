@@ -149,12 +149,12 @@ def execute_command(command):
     
     if language_config.get("go") in words:
         if language_config.get("back") in words:
-            pyautogui.hotkey('command', '[')
+            _navigate_history(forward=False)
             publish_interaction("back")
             print("INFO: Going back")
             return
         elif language_config.get("forward") in words:
-            pyautogui.hotkey('command', ']')
+            _navigate_history(forward=True)
             publish_interaction("forward")
             print("INFO: Going forward")
             return
@@ -171,11 +171,11 @@ def execute_command(command):
         return
 
     if language_config.get("back") in words:
-        pyautogui.hotkey('command', '[')
+        _navigate_history(forward=False)
         publish_interaction("back")
         print("INFO: Going back")
     elif language_config.get("forward") in words:
-        pyautogui.hotkey('command', ']')
+        _navigate_history(forward=True)
         publish_interaction("forward")
         print("INFO: Going forward")
     
@@ -183,6 +183,18 @@ def execute_command(command):
     if language_config.get("click") in words:
         pyautogui.click()
         print("INFO: Mouse click performed")
+
+def _navigate_history(forward: bool):
+    """
+    Sends Chrome's back/forward shortcut: Cmd+[ / Cmd+] on macOS,
+    Alt+Left / Alt+Right on Windows and Linux (where "command" maps to the
+    Windows key and does nothing in the browser)
+    @param forward: True to go forward, False to go back
+    """
+    if platform.system() == "Darwin":
+        pyautogui.hotkey("command", "]" if forward else "[")
+    else:
+        pyautogui.hotkey("alt", "right" if forward else "left")
 
 def _type_via_clipboard(text: str):
     """

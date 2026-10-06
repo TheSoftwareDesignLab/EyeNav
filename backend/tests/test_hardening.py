@@ -322,5 +322,29 @@ class CapturerCrashTests(RecordingTestCase):
             session_manager.reset_capturer_cache()
 
 
+class PlatformShortcutTests(unittest.TestCase):
+    """Back/forward and paste must use each OS's own Chrome shortcuts -
+    "command" is the Windows key outside macOS and does nothing there."""
+
+    def hotkeys_on(self, system, action):
+        with stub_hardware():
+            import voice_control
+            with patch.object(voice_control.platform, "system", return_value=system):
+                action(voice_control)
+            return [c.args for c in voice_control.pyautogui.hotkey.call_args_list]
+
+    def test_back_and_forward_on_macos(self):
+        calls = self.hotkeys_on("Darwin", lambda vc: (vc._navigate_history(False), vc._navigate_history(True)))
+        self.assertEqual(calls, [("command", "["), ("command", "]")])
+
+    def test_back_and_forward_on_windows(self):
+        calls = self.hotkeys_on("Windows", lambda vc: (vc._navigate_history(False), vc._navigate_history(True)))
+        self.assertEqual(calls, [("alt", "left"), ("alt", "right")])
+
+    def test_paste_on_windows(self):
+        calls = self.hotkeys_on("Windows", lambda vc: vc._type_via_clipboard("hola"))
+        self.assertEqual(calls, [("ctrl", "v")])
+
+
 if __name__ == "__main__":
     unittest.main()
