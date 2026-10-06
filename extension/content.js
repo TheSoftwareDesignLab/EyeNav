@@ -162,13 +162,14 @@ function handleClick(event) {
 
     const element = event.target;
 
+    // Only what the backend turns into a step. textContent used to be sent
+    // too (and ignored there): a click on <body> or a large container posted
+    // the whole page's text, whatever it contained.
     const tagData = {
         tagName: element.tagName.toLowerCase(),
         href: element.getAttribute('href') || null,
         id: element.id || null,
-        className: element.className || null,
-        xpath: getXPath(element),
-        textContent: element.textContent.trim() || null
+        xpath: getXPath(element)
     };
 
     reportEvent('/tag-info', tagData, 'Clicked');

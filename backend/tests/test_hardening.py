@@ -7,20 +7,27 @@ starting up, and capturer crashes being reported on the session. voice_control
 and eye_tracking are imported against stub hardware modules, so no Vosk model,
 microphone or Tobii tracker is needed.
 """
+import base64
 import contextlib
+import hashlib
+import json
+import os
+import stat
 import sys
 import threading
 import types
 import unittest
 from unittest.mock import MagicMock, patch
 
+import main
 import security
 import session_manager
 import session_recorder
 import websocket_server
 from tests.test_recording_pipeline import RecordingTestCase, wait_for
 
-EXTENSION = "chrome-extension://" + "a" * 32
+EXTENSION = security.EXTENSION_ORIGIN
+OTHER_EXTENSION = "chrome-extension://" + "a" * 32
 EVIL = "https://evil.example"
 
 
@@ -32,6 +39,23 @@ class SecurityHelperTests(unittest.TestCase):
         self.assertFalse(security.is_trusted_origin("null"))
         self.assertFalse(security.is_trusted_origin("chrome-extension://short"))
         self.assertFalse(security.is_trusted_origin(EXTENSION + ".evil.example"))
+        self.assertFalse(security.is_trusted_origin(EXTENSION + "\n"))
+
+    def test_another_installed_extension_is_not_trusted(self):
+        self.assertFalse(security.is_trusted_origin(OTHER_EXTENSION))
+
+    def test_the_pinned_id_matches_the_manifest_key(self):
+        manifest_path = os.path.join(os.path.dirname(__file__), "..", "..", "extension", "manifest.json")
+        with open(manifest_path) as f:
+            key = base64.b64decode(json.load(f)["key"])
+        derived = "".join(chr(ord("a") + int(c, 16)) for c in hashlib.sha256(key).hexdigest()[:32])
+        self.assertEqual(derived, security.EXTENSION_ID)
+
+    def test_languages(self):
+        for language in ("en-us", "es", "pt-br"):
+            self.assertTrue(security.is_valid_language(language), language)
+        for language in ("../../x", "en us", "", "e", "en-us/../x", None):
+            self.assertFalse(security.is_valid_language(language), language)
 
     def test_hosts(self):
         for host in ("localhost:5001", "127.0.0.1:5001", "localhost", "[::1]:5001"):
@@ -84,6 +108,56 @@ class UntrustedCallerTests(RecordingTestCase):
         self.assertEqual(self.client.post("/start", json=self.START, headers=headers).status_code, 200)
         self.assertEqual(self.client.get("/status", headers=headers).status_code, 200)
         self.assertEqual(self.client.post("/stop", headers=headers).status_code, 200)
+
+    def test_another_extension_cannot_start_a_session(self):
+        response = self.client.post("/start", json=self.START, headers={"Origin": OTHER_EXTENSION})
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(session_manager.is_session_active())
+
+    def test_an_invalid_language_header_is_rejected(self):
+        response = self.client.post("/start", json=self.START, headers={"Language": "../../x"})
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(session_manager.is_session_active())
+
+    def test_an_oversized_body_is_rejected_as_json(self):
+        self.client.post("/start", json=self.START)
+        response = self.client.post("/input-info", json={"text": "A" * 100_000, "xpath": "/a"})
+        self.assertEqual(response.status_code, 413)
+        self.assertEqual(response.get_json()["status"], "Request body too large")
+
+    def test_a_long_field_is_cut_before_it_is_recorded(self):
+        session = session_manager.start_session("P", "http://x", "en-us", "mouse_keyboard")
+        self.client.post("/input-info", json={"text": "A" * 10_000, "xpath": "/a"})
+        wait_for(lambda: os.path.exists(session.events_file) and os.path.getsize(session.events_file) > 0)
+        session_manager.stop_session()
+        with open(session.events_file) as f:
+            event = json.loads(f.readline())
+        self.assertEqual(len(event["data"]["text"]), main.MAX_FIELD_LENGTH)
+
+    def test_recordings_are_readable_by_their_owner_only(self):
+        session = session_manager.start_session("P", "http://x", "en-us", "mouse_keyboard")
+        self.client.post("/input-info", json={"text": "secret", "xpath": "/a"})
+        wait_for(lambda: os.path.exists(session.events_file) and os.path.getsize(session.events_file) > 0)
+        session_manager.stop_session()
+        for path in (session.test_file, session.events_file):
+            self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600, path)
+        self.assertEqual(stat.S_IMODE(os.stat(os.path.dirname(session.test_file)).st_mode), 0o700)
+
+    def test_typed_text_is_not_written_to_the_log(self):
+        session_manager.start_session("P", "http://x", "en-us", "mouse_keyboard")
+        with self.assertLogs("interaction_logger", level="INFO") as logs:
+            self.client.post("/input-info", json={"text": "my secret text", "xpath": "/a"})
+            wait_for(lambda: logs.output)
+        session_manager.stop_session()
+        self.assertFalse(any("my secret text" in line for line in logs.output), logs.output)
+
+    def test_session_errors_are_bounded(self):
+        session = session_manager.start_session("P", "http://x", "en-us", "mouse_keyboard")
+        for i in range(session_recorder.MAX_SESSION_ERRORS + 50):
+            session.add_error(f"error {i}")
+        session_manager.stop_session()
+        self.assertEqual(len(session.errors), session_recorder.MAX_SESSION_ERRORS)
+        self.assertEqual(session.errors[-1], f"error {session_recorder.MAX_SESSION_ERRORS + 49}")
 
     def test_a_failure_writing_the_session_files_is_a_json_error(self):
         with patch.object(session_recorder, "create_session", side_effect=OSError("disk full")):

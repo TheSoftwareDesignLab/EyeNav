@@ -28,6 +28,23 @@ app = Flask(__name__)
 # Access-Control-Allow-Private-Network: false.
 CORS(app, origins=[security.EXTENSION_ORIGIN], allow_private_network=True)
 
+# Every request this backend accepts is a few small JSON fields. Without a
+# cap, one POST of any size was parsed into memory and its text written to
+# both the .jsonl and the .feature (a 20 MB body was accepted and written
+# out twice), so any caller could fill the disk or memory.
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
+
+# Longest value kept for any single captured field (typed text, id, xpath,
+# href). Comfortably above anything typed by hand into a form field; longer
+# values are cut rather than rejected, so the step is still recorded.
+MAX_FIELD_LENGTH = 4096
+
+
+@app.errorhandler(413)
+def _request_too_large(_error):
+    # Flask's default is an HTML page, which the extension can't parse.
+    return jsonify({"status": "Request body too large"}), 413
+
 
 @app.before_request
 def _reject_untrusted_callers():
@@ -86,8 +103,10 @@ def _as_str(value):
     those wrong-type values flow through the SAME "missing/invalid field"
     handling every route already has for a field that's simply absent,
     instead of crashing several calls deep with an unhandled 500.
+    Also cut to MAX_FIELD_LENGTH, so no single field can blow up the files
+    it ends up in.
     """
-    return value if isinstance(value, str) else None
+    return value[:MAX_FIELD_LENGTH] if isinstance(value, str) else None
 
 
 def _publish_browser_event(event_type, data, skip_in_modes=()):
@@ -145,7 +164,9 @@ def start_tracking():
     if not page_name or not page_url:
         return jsonify({"status": "pageName and pageUrl are required"}), 400
 
-    language = request.headers.get('Language', 'en-us')
+    language = request.headers.get('Language', 'en-us').lower()
+    if not security.is_valid_language(language):
+        return jsonify({"status": "Invalid Language header"}), 400
     # The popup and side panel both send captureMode now; the default only
     # covers a raw request that omits it. A non-string captureMode (a JSON
     # array/object) becomes None here, which session_manager.start_session's

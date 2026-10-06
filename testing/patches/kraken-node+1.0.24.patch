@@ -1,0 +1,50 @@
+diff --git a/node_modules/kraken-node/lib/clients/Client.js b/node_modules/kraken-node/lib/clients/Client.js
+index dfa1e71..e56124a 100644
+--- a/node_modules/kraken-node/lib/clients/Client.js
++++ b/node_modules/kraken-node/lib/clients/Client.js
+@@ -109,7 +109,11 @@ var Client = /** @class */ (function (_super) {
+                         return [4 /*yield*/, this.stop()];
+                     case 2:
+                         _a.sent();
+-                        this.notifyFinished(userId);
++                        // EyeNav patch: "finished" is now notified by
++                        // DeviceProcess when the cucumber process exits, i.e.
++                        // after its JSON report is fully written. Notifying it
++                        // here (inside the After hook) made the reporter read
++                        // a half-written report.json.
+                         return [2 /*return*/];
+                 }
+             });
+diff --git a/node_modules/kraken-node/lib/processes/DeviceProcess.js b/node_modules/kraken-node/lib/processes/DeviceProcess.js
+index d6c67fc..c96cd49 100644
+--- a/node_modules/kraken-node/lib/processes/DeviceProcess.js
++++ b/node_modules/kraken-node/lib/processes/DeviceProcess.js
+@@ -66,17 +66,24 @@ var DeviceProcess = /** @class */ (function () {
+         this.testScenario = testScenario;
+     }
+     DeviceProcess.prototype.runWithArgs = function (args) {
++        var _this = this;
+         return __awaiter(this, void 0, void 0, function () {
+             var cucumberProcess;
+             return __generator(this, function (_a) {
+                 cucumberProcess = child_process_1.spawn('node', args, {
+                     stdio: 'inherit'
+                 });
+-                cucumberProcess.on('exit', function (err) {
+-                    if (err) {
+-                        console.log('Could not execute test');
+-                        process.exit(1);
++                // EyeNav patch: mark this process finished only once cucumber
++                // has exited (its JSON report is complete by then), and don't
++                // abort Kraken on exit code 1 - that's just a failed scenario,
++                // which should still get its report.
++                cucumberProcess.on('exit', function (code) {
++                    if (code) {
++                        console.log("KRAKEN: cucumber exited with code " + code + " (failed scenario or execution error)");
+                     }
++                    var filePath = Constants.PROCESS_STATE_FILE_PATH["" + Constants.PROCESS_STATES.finished];
++                    FileHelper_1.FileHelper.instance().createKrakenSupportFileIfDoesNotExist(filePath);
++                    FileHelper_1.FileHelper.instance().appendTextToFile("" + _this.id, filePath);
+                 });
+                 return [2 /*return*/];
+             });

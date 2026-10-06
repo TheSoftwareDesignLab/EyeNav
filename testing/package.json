@@ -1,5 +1,11 @@
 {
   "dependencies": {
     "kraken-node": "^1.0.24"
+  },
+  "devDependencies": {
+    "patch-package": "^8.0.1"
+  },
+  "scripts": {
+    "postinstall": "patch-package"
   }
 }

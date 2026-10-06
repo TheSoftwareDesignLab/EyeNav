@@ -137,9 +137,9 @@ function initEyeNavPanel(captureMode, knownStatus) {
     Promise.all([localePromise, commandsPromise]).then(([localeData, configData]) => {
         strings = localeData;
         language_config = configData;
-        alertBelowButton.innerHTML = strings['eyenav-ensure-server-running'] || "Ensure the server is running";
+        alertBelowButton.textContent = strings['eyenav-ensure-server-running'] || "Ensure the server is running";
         if (voiceCommand) {
-            voiceCommand.innerHTML = strings['initial-nlp-command'] || "Recognized voice commands will appear here";
+            voiceCommand.textContent = strings['initial-nlp-command'] || "Recognized voice commands will appear here";
         }
 
         applyEyeNavTranslations(strings);
@@ -521,7 +521,23 @@ function initEyeNavPanel(captureMode, knownStatus) {
      * @param {string} command - The NLP command to display
      */
     let inputMode = false;
-    let highlightedWord = '';
+
+    /**
+     * A word of the command as a node: colored <span> when highlighted, plain
+     * text otherwise. Built with textContent, never markup - the command is
+     * text received over the WebSocket, and interpolating it into innerHTML
+     * let whatever it contained be parsed as HTML in the extension's page.
+     * @param {string} word
+     * @param {string|null} color
+     * @returns {Node}
+     */
+    function commandWordNode(word, color) {
+        if (!color) return document.createTextNode(word);
+        const span = document.createElement('span');
+        span.style.color = color;
+        span.textContent = word;
+        return span;
+    }
 
     function displayNLPCommand(command) {
         console.log('EYENAV: NLP Command:', command);
@@ -532,26 +548,28 @@ function initEyeNavPanel(captureMode, knownStatus) {
         commandElement.style.fontWeight = 'bold';
         commandElement.style.textAlign = 'center';
 
-        const controlWords = (language_config[language] || {})['control_words'] || [];
+        const config = language_config[language] || {};
+        const controlWords = config['control_words'] || [];
+        const typingExit = config['typing_exit'] || [];
         const words = command.split(' ');
         let tempInputMode = inputMode;
-        const highlightedCommand = words.map(word => {
+        words.forEach((word, index) => {
+            if (index > 0) commandElement.appendChild(document.createTextNode(' '));
+            let color = null;
             if (controlWords.includes(word.toLowerCase())) {
-                highlightedWord = `<span style="color: green;">${word}</span>`;
-                if (word.toLowerCase() === language_config[language]['typing_trigger']) {
+                color = 'green';
+                if (word.toLowerCase() === config['typing_trigger']) {
                     tempInputMode = true;
-                } else if (language_config[language]['typing_exit'].includes(word.toLowerCase())) {
+                } else if (typingExit.includes(word.toLowerCase())) {
                     tempInputMode = false;
                 }
-            } else {
-                highlightedWord = tempInputMode ? `<span style="color: blue;">${word}</span>` : word;
+            } else if (tempInputMode) {
+                color = 'blue';
             }
-            return highlightedWord;
-        }).join(' ');
+            commandElement.appendChild(commandWordNode(word, color));
+        });
 
-        commandElement.innerHTML = highlightedCommand;
-        voiceCommand.innerHTML = '';
-        voiceCommand.appendChild(commandElement);
+        voiceCommand.replaceChildren(commandElement);
         inputMode = tempInputMode;
 
         voiceCommand.style.color = inputMode ? 'blue' : 'black';

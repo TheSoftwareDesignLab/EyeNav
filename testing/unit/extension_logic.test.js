@@ -155,6 +155,76 @@ test('the content script answers a viewport request with the current window size
     assert.deepEqual(plain(page.askViewport()), { width: 777, height: 720 });
 });
 
+test('a click reports only what becomes a step, not the element text', async () => {
+    const page = loadContentScript();
+    page.click();
+    await flush();
+
+    assert.deepEqual(Object.keys(page.sent[0].data).sort(), ['href', 'id', 'tagName', 'xpath']);
+});
+
+// ------------------------------------------------------------- background.js
+
+function loadBackground({ sessionActive = true } = {}) {
+    const requests = [];
+    let messageListener = null;
+    let now = 0;
+
+    const sandbox = {
+        importScripts() {},
+        chrome: {
+            sidePanel: { setPanelBehavior: () => Promise.resolve() },
+            runtime: { onMessage: { addListener(fn) { messageListener = fn; } } },
+        },
+        fetch(url, options = {}) {
+            requests.push({ url, method: options.method || 'GET' });
+            const body = url.endsWith('/status') ? { sessionActive } : { status: 'received' };
+            return Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
+        },
+        Date: { now: () => now },
+        console,
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(read('extension', 'shared', 'config.js'), sandbox);
+    vm.runInContext(read('extension', 'background.js'), sandbox);
+
+    return {
+        requests,
+        advance: (ms) => { now += ms; },
+        report: (endpoint) => new Promise((resolve) => {
+            messageListener({ type: 'EYENAV_REPORT', endpoint, data: {} }, {}, resolve);
+        }),
+    };
+}
+
+test('the relay refuses endpoints other than the report ones', async () => {
+    const background = loadBackground();
+    for (const endpoint of ['/start', '/stop', '@evil.example/x']) {
+        const response = await background.report(endpoint);
+        assert.equal(response.success, false, endpoint);
+    }
+    assert.deepEqual(background.requests, []);
+});
+
+test('nothing is sent to the backend while no session is recording', async () => {
+    const background = loadBackground({ sessionActive: false });
+    const response = await background.report('/input-info');
+
+    assert.equal(response.ok, true);
+    assert.deepEqual(background.requests.map(r => r.method), ['GET']);
+});
+
+test('reports during a session are sent, and the active state is reused briefly', async () => {
+    const background = loadBackground();
+    await background.report('/tag-info');
+    await background.report('/input-info');
+    background.advance(5000);
+    await background.report('/tag-info');
+
+    assert.deepEqual(background.requests.map(r => r.url.replace('http://localhost:5001', '')),
+        ['/status', '/tag-info', '/input-info', '/status', '/tag-info']);
+});
+
 // ------------------------------------------------------------------- step.js
 
 function loadSteps() {

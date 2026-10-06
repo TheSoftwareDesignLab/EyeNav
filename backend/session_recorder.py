@@ -8,6 +8,8 @@ import settings
 
 SESSION_STATES = {"idle", "running", "stopped"}
 
+MAX_SESSION_ERRORS = 100
+
 
 @dataclass
 class Session:
@@ -49,6 +51,10 @@ class Session:
         @param message: a short, human-readable description of what failed
         """
         self.errors.append(message)
+        # Bounded, so a session that keeps failing (or is flooded with bad
+        # events) can't grow this without limit; /status only shows the
+        # last 20 anyway.
+        del self.errors[:-MAX_SESSION_ERRORS]
 
 
 def generate_session_id():

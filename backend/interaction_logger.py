@@ -54,7 +54,10 @@ def main(session):
         if event_bus.is_stop_signal(event):
             break
 
-        logger.info("Logging event %s", event)
+        # Source and type only: the payload carries what the user typed or
+        # dictated, which belongs in the session's own (owner-only) files,
+        # not in the console output.
+        logger.info("Logging %s/%s event", event.source, event.type)
 
         try:
             log_event(session, event)
