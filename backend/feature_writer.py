@@ -89,6 +89,27 @@ def to_gherkin_step(event):
     if event.type == "go":
         return '\tAnd I scroll down' if data.get("direction", 0) > 0 else '\tAnd I scroll up'
 
+    if event.type == "select":
+        text, xpath = data.get("text"), data.get("xpath")
+        if text is None or not xpath:
+            return None
+        return f'\tAnd I select "{escape_gherkin_string(text)}" in the dropdown with xpath "{escape_gherkin_string(xpath)}"'
+
+    if event.type == "scroll":
+        x, y, xpath = data.get("x"), data.get("y"), data.get("xpath")
+        if x is None or y is None:
+            return None
+        if xpath:
+            return f'\tAnd I scroll the element with xpath "{escape_gherkin_string(xpath)}" to {x},{y}'
+        return f'\tAnd I scroll the page to {x},{y}'
+
+    if event.type == "drag":
+        source, target = data.get("source_xpath"), data.get("target_xpath")
+        if not source or not target:
+            return None
+        return (f'\tAnd I drag the element with xpath "{escape_gherkin_string(source)}" '
+                f'onto the element with xpath "{escape_gherkin_string(target)}"')
+
     if event.type == "resize":
         # Reuses the exact same step text _feature_header writes for the
         # initial viewport, just with "And" instead of "Given" to match every

@@ -24,7 +24,9 @@ chrome.sidePanel
 // The only endpoints content.js reports to. Anything else is refused here, so
 // a relayed message can't reach /start or /stop, or - via an endpoint like
 // "@other.host/" - turn the URL below into a request to a different host.
-const REPORT_ENDPOINTS = new Set(['/tag-info', '/input-info', '/viewport-info']);
+const REPORT_ENDPOINTS = new Set([
+  '/tag-info', '/input-info', '/viewport-info', '/select-info', '/scroll-info', '/drag-info',
+]);
 
 // content.js runs on every page and reports every click and committed field,
 // whether or not a session is recording. Those are only sent once /status

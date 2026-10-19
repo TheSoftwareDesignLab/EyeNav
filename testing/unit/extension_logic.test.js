@@ -1,92 +1,16 @@
-// Run from the repo root:  node --test testing/unit
+// Run from the repo root:  node --test testing/unit/*.test.js
 //
 // Loads the REAL content.js and step.js into a sandbox with just enough
 // browser/WebdriverIO stubs to run them - no Chrome, no Selenium.
+// (The scaffolding lives in ./support.js, shared with interactions.test.js.)
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-
-const repo = path.join(__dirname, '..', '..');
-const read = (...parts) => fs.readFileSync(path.join(repo, ...parts), 'utf8');
-const flush = () => new Promise(resolve => setImmediate(resolve));
-// Objects built inside the vm sandbox have that realm's Object.prototype, which
-// assert.deepEqual (strict) refuses to equate with test-side literals.
-const plain = (value) => JSON.parse(JSON.stringify(value));
-
-function makeClock() {
-    let now = 0;
-    let nextId = 1;
-    const timers = new Map();
-    return {
-        setTimeout(fn, ms) {
-            const id = nextId++;
-            timers.set(id, { fn, at: now + ms });
-            return id;
-        },
-        clearTimeout(id) {
-            timers.delete(id);
-        },
-        advance(ms) {
-            now += ms;
-            for (const [id, timer] of [...timers]) {
-                if (timer.at <= now) {
-                    timers.delete(id);
-                    timer.fn();
-                }
-            }
-        },
-    };
-}
+const {
+    flush, plain, loadContentScript, loadBackground, loadSteps, makeDriver, names,
+} = require('./support');
 
 // ---------------------------------------------------------------- content.js
 
-function loadContentScript({ relayResponse = { success: true, ok: true, data: {} } } = {}) {
-    const clock = makeClock();
-    const sent = [];
-    const logs = { log: [], error: [] };
-    let messageListener = null;
-
-    const sandbox = {
-        window: { innerWidth: 1280, innerHeight: 720, devicePixelRatio: 1, addEventListener() {} },
-        document: { body: {}, querySelectorAll: () => [], addEventListener() {} },
-        Node: { ELEMENT_NODE: 1 },
-        MutationObserver: class { observe() {} },
-        chrome: {
-            runtime: {
-                sendMessage(message, callback) {
-                    sent.push(message);
-                    callback(relayResponse);
-                },
-                onMessage: { addListener(fn) { messageListener = fn; } },
-            },
-        },
-        console: { log: (...a) => logs.log.push(a.join(' ')), error: (...a) => logs.error.push(a.join(' ')) },
-        setTimeout: clock.setTimeout,
-        clearTimeout: clock.clearTimeout,
-    };
-    vm.createContext(sandbox);
-    vm.runInContext(read('extension', 'shared', 'config.js'), sandbox);
-    vm.runInContext(read('extension', 'content.js'), sandbox);
-
-    const call = (expression) => vm.runInContext(expression, sandbox);
-    sandbox.__element = {
-        nodeType: 1, tagName: 'BUTTON', id: 'go', className: '', textContent: ' Go ', parentNode: null,
-        getAttribute: () => null,
-    };
-    return {
-        clock, sent, logs, window: sandbox.window,
-        click: () => call('handleClick({ target: __element })'),
-        resize: () => call('handleResize()'),
-        endpoints: () => sent.map(message => message.endpoint),
-        askViewport: () => {
-            let response;
-            messageListener({ type: 'EYENAV_GET_VIEWPORT' }, {}, (r) => { response = r; });
-            return response;
-        },
-    };
-}
 
 test('a resize that settles is reported once, at its final size', async () => {
     const page = loadContentScript();
@@ -165,37 +89,6 @@ test('a click reports only what becomes a step, not the element text', async () 
 
 // ------------------------------------------------------------- background.js
 
-function loadBackground({ sessionActive = true } = {}) {
-    const requests = [];
-    let messageListener = null;
-    let now = 0;
-
-    const sandbox = {
-        importScripts() {},
-        chrome: {
-            sidePanel: { setPanelBehavior: () => Promise.resolve() },
-            runtime: { onMessage: { addListener(fn) { messageListener = fn; } } },
-        },
-        fetch(url, options = {}) {
-            requests.push({ url, method: options.method || 'GET' });
-            const body = url.endsWith('/status') ? { sessionActive } : { status: 'received' };
-            return Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
-        },
-        Date: { now: () => now },
-        console,
-    };
-    vm.createContext(sandbox);
-    vm.runInContext(read('extension', 'shared', 'config.js'), sandbox);
-    vm.runInContext(read('extension', 'background.js'), sandbox);
-
-    return {
-        requests,
-        advance: (ms) => { now += ms; },
-        report: (endpoint) => new Promise((resolve) => {
-            messageListener({ type: 'EYENAV_REPORT', endpoint, data: {} }, {}, resolve);
-        }),
-    };
-}
 
 test('the relay refuses endpoints other than the report ones', async () => {
     const background = loadBackground();
@@ -227,49 +120,9 @@ test('reports during a session are sent, and the active state is reused briefly'
 
 // ------------------------------------------------------------------- step.js
 
-function loadSteps() {
-    const steps = {};
-    const sandbox = {
-        require: () => ({
-            Given: (pattern, fn) => { steps[pattern] = fn; },
-            When() {}, Then() {},
-        }),
-        console,
-    };
-    vm.createContext(sandbox);
-    vm.runInContext(read('testing', 'features', 'web', 'step_definitions', 'step.js'), sandbox);
-    return steps;
-}
 
-function makeElement(log) {
-    return {
-        waitForExist: async (options) => { log.push(['waitForExist', options]); },
-        waitForDisplayed: async (options) => { log.push(['waitForDisplayed', options]); },
-        click: async () => { log.push(['click']); },
-        clearValue: async () => { log.push(['clearValue']); },
-        scrollIntoView: async (options) => { log.push(['scrollIntoView', options]); },
-    };
-}
 
-// $$ answers [] until `renderAfterCalls` lookups have happened, like WebdriverIO
-// does for an element a slow request has not rendered yet.
-function makeDriver(log, { renderAfterCalls = 0 } = {}) {
-    let lookups = 0;
-    const element = makeElement(log);
-    return {
-        $$: async () => (++lookups > renderAfterCalls ? [element] : []),
-        $: async () => element,
-        waitUntil: async (condition, options) => {
-            for (let attempt = 0; attempt < 50; attempt++) {
-                if (await condition()) return true;
-            }
-            throw new Error(options.timeoutMsg);
-        },
-        keys: async (text) => { log.push(['keys', text]); },
-    };
-}
 
-const names = (log) => log.map(entry => entry[0]);
 
 test('an xpath step waits for an element that renders late, then acts on it', async () => {
     const log = [];

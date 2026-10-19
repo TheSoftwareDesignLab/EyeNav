@@ -5,7 +5,6 @@ Covers the recording pipeline's contracts: how events become Gherkin steps,
 what the HTTP routes accept/return, and the session start/stop lifecycle.
 No hardware is needed - capturers are replaced with fakes.
 """
-import glob
 import os
 import threading
 import time
@@ -41,19 +40,11 @@ def click_event(**data):
 
 
 class RecordingTestCase(unittest.TestCase):
-    """Starts every test with no session running, and removes the files it created."""
-
-    @classmethod
-    def setUpClass(cls):
-        cls._dirs = [settings.TEST_DIRECTORY, settings.EVENTS_DIRECTORY, settings.TRANSCRIPTION_DIR]
-        cls._existing = {path for d in cls._dirs for path in glob.glob(os.path.join(d, "*"))}
-
-    @classmethod
-    def tearDownClass(cls):
-        for d in cls._dirs:
-            for path in glob.glob(os.path.join(d, "*")):
-                if path not in cls._existing:
-                    os.remove(path)
+    """
+    Starts every test with no session running. The files the tests record go
+    to a temporary directory (see tests/__init__.py), so nothing needs
+    cleaning up here and the real recordings are never involved.
+    """
 
     def setUp(self):
         self._stop_any_session()
@@ -68,6 +59,22 @@ class RecordingTestCase(unittest.TestCase):
     def _stop_any_session():
         if session_manager.is_session_active():
             session_manager.stop_session()
+
+
+class RecordingsAreIsolatedTests(unittest.TestCase):
+    """Fails loudly if the suite could ever write into the user's real recordings."""
+
+    def test_the_recording_folders_are_not_the_real_ones(self):
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        for folder in (settings.TEST_DIRECTORY, settings.EVENTS_DIRECTORY, settings.TRANSCRIPTION_DIR):
+            real = os.path.realpath(os.path.join(backend_dir, os.path.basename(folder)))
+            self.assertNotEqual(os.path.realpath(folder), real)
+
+    def test_the_recording_folders_live_under_the_suites_temporary_directory(self):
+        data_dir = os.path.realpath(os.environ["EYENAV_DATA_DIR"])
+        self.assertTrue(os.path.basename(data_dir).startswith("eyenav-test-recordings-"))
+        for folder in (settings.TEST_DIRECTORY, settings.EVENTS_DIRECTORY, settings.TRANSCRIPTION_DIR):
+            self.assertEqual(os.path.dirname(os.path.realpath(folder)), data_dir)
 
 
 class EventModelTests(unittest.TestCase):

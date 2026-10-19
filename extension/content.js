@@ -158,7 +158,7 @@ function handleClick(event) {
     if (event.isEyeNavHandled) return;  // Prevent duplicate execution
     event.isEyeNavHandled = true;  // Mark event as handled by EyeNav
 
-    flushPendingResize();
+    flushPendingReports();
 
     const element = event.target;
 
@@ -222,17 +222,23 @@ function isTextInput(element) {
  */
 function handleInputCommit(event) {
     const element = event.target;
-    if (!isTextInput(element)) return;
+    const isSelect = element.tagName && element.tagName.toLowerCase() === 'select';
+    if (!isSelect && !isTextInput(element)) return;
     if (event.isEyeNavHandled) return;
     event.isEyeNavHandled = true;
 
-    flushPendingResize();
+    flushPendingReports();
+
+    if (isSelect) {
+        reportSelectedOption(element);
+        return;
+    }
 
     // `change` only fires when the value actually changed, so this also
     // correctly captures the user clearing a field back to empty - an
     // earlier `if (!value) return` here silently dropped that case.
     const inputData = {
-        text: element.value,
+        text: clipText(element.value),
         tagName: element.tagName.toLowerCase(),
         id: element.id || null,
         xpath: getXPath(element)
@@ -241,13 +247,73 @@ function handleInputCommit(event) {
     reportEvent('/input-info', inputData, 'Input committed');
 }
 
+// Same limit the backend applies to any single captured field (MAX_FIELD_LENGTH
+// in main.py). Cutting here too keeps one huge text from making the whole
+// request exceed the backend's body size limit and be rejected outright.
+const MAX_REPORTED_TEXT = 4096;
+
+function clipText(value) {
+    return String(value).slice(0, MAX_REPORTED_TEXT);
+}
+
+/**
+ * Reports waiting for a gesture to SETTLE (dragging a window edge, scrolling)
+ * instead of firing on every tick of it. They are flushed before anything
+ * else is reported - see flushPendingReports.
+ * @type {Set<{flush: function}>}
+ */
+const pendingReporters = new Set();
+
+/**
+ * Builds a reporter that calls `send` once `delayMs` has passed with no new
+ * trigger, so a gesture that fires dozens of events yields one report: the
+ * state it ended in.
+ * @param {number} delayMs
+ * @param {function(): void} send
+ */
+function createSettledReporter(delayMs, send) {
+    let timer = null;
+    const reporter = {
+        trigger() {
+            clearTimeout(timer);
+            timer = setTimeout(reporter.flush, delayMs);
+            pendingReporters.add(reporter);
+        },
+        // Reports now, if something is waiting.
+        flush() {
+            if (timer === null) return;
+            clearTimeout(timer);
+            timer = null;
+            pendingReporters.delete(reporter);
+            send();
+        },
+        // Drops what is waiting without reporting it.
+        cancel() {
+            clearTimeout(timer);
+            timer = null;
+            pendingReporters.delete(reporter);
+        },
+    };
+    return reporter;
+}
+
+/**
+ * Sends every report still waiting for its gesture to settle. Called before
+ * each click, field commit, selection and drop is reported: the wait delays a
+ * resize or scroll by up to a few hundred ms, so without this an action made
+ * right after one was reported FIRST and the .feature would replay them in the
+ * wrong order.
+ */
+function flushPendingReports() {
+    [...pendingReporters].forEach(reporter => reporter.flush());
+}
+
 // How long to wait after the last resize tick before reporting the viewport
 // size - a window drag fires 'resize' continuously (dozens of events for one
 // gesture), so reporting on every tick would flood the session with
 // near-duplicate viewport steps. Reporting only once resizing settles
 // records the one size that actually mattered: the one the user ended up at.
 const RESIZE_REPORT_DEBOUNCE_MS = 400;
-let resizeReportTimer = null;
 
 // Browser zoom (Ctrl +/-) also fires 'resize' and changes innerWidth/Height
 // (they're in CSS px), but the window itself didn't change size. It shows up
@@ -258,19 +324,7 @@ function reportViewportNow() {
     reportEvent('/viewport-info', { width: window.innerWidth, height: window.innerHeight }, 'Viewport resized');
 }
 
-/**
- * Reports a pending (debounced) resize immediately. Called before every
- * click/input report: the debounce delays the resize by up to
- * RESIZE_REPORT_DEBOUNCE_MS, so without this a click made right after a
- * resize was reported FIRST and the resize after it - the .feature would
- * then replay them in the wrong order.
- */
-function flushPendingResize() {
-    if (resizeReportTimer === null) return;
-    clearTimeout(resizeReportTimer);
-    resizeReportTimer = null;
-    reportViewportNow();
-}
+const resizeReporter = createSettledReporter(RESIZE_REPORT_DEBOUNCE_MS, reportViewportNow);
 
 /**
  * Handle the window being resized mid-session - debounced (see above), so
@@ -282,16 +336,174 @@ function flushPendingResize() {
 function handleResize() {
     if (window.devicePixelRatio !== lastDevicePixelRatio) {
         lastDevicePixelRatio = window.devicePixelRatio;
-        clearTimeout(resizeReportTimer);
-        resizeReportTimer = null;
+        resizeReporter.cancel();
         return;
     }
+    resizeReporter.trigger();
+}
 
-    clearTimeout(resizeReportTimer);
-    resizeReportTimer = setTimeout(() => {
-        resizeReportTimer = null;
-        reportViewportNow();
-    }, RESIZE_REPORT_DEBOUNCE_MS);
+// ------------------------------------------------------------------ scrolling
+
+// A scroll gesture fires a stream of 'scroll' events; only where it ended up
+// matters, so it is reported once it has been quiet this long.
+const SCROLL_REPORT_DEBOUNCE_MS = 300;
+
+/** Per scrolled target (the document, or one scrollable element): its settled reporter and last reported position. */
+const scrollStates = new WeakMap();
+
+function isPageScroll(target) {
+    return target === document || target === document.documentElement || target === document.scrollingElement;
+}
+
+/**
+ * Typing makes these scroll by themselves (a textarea following the caret, a
+ * long line in an input, an editor growing past its box). That is the text
+ * being entered, which is recorded on its own, not a scroll the user made.
+ */
+function scrollsBecauseOfTyping(element) {
+    const tag = element.tagName ? element.tagName.toLowerCase() : '';
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || element.isContentEditable === true;
+}
+
+function scrollPosition(target) {
+    return target === document
+        ? { x: Math.round(window.scrollX), y: Math.round(window.scrollY) }
+        : { x: Math.round(target.scrollLeft), y: Math.round(target.scrollTop) };
+}
+
+function reportScroll(target, state) {
+    const position = scrollPosition(target);
+    if (state.last && state.last.x === position.x && state.last.y === position.y) return;
+
+    // No xpath means "the page" to the backend, so an element whose xpath can't
+    // be computed (a detached node) is skipped rather than sent as a page scroll.
+    const xpath = target === document ? null : getXPath(target);
+    if (target !== document && !xpath) return;
+
+    state.last = position;
+    reportEvent('/scroll-info', { x: position.x, y: position.y, xpath }, 'Scrolled');
+}
+
+/**
+ * Handle any scroll (captured on the way down: element scrolls don't bubble).
+ * @param {Event} event
+ */
+function handleScroll(event) {
+    const target = isPageScroll(event.target) ? document : event.target;
+    if (target !== document && (target.nodeType !== 1 || scrollsBecauseOfTyping(target))) return;
+
+    let state = scrollStates.get(target);
+    if (!state) {
+        state = { last: null };
+        state.reporter = createSettledReporter(SCROLL_REPORT_DEBOUNCE_MS, () => reportScroll(target, state));
+        scrollStates.set(target, state);
+    }
+    state.reporter.trigger();
+}
+
+// ------------------------------------------------------ dropdowns, rich text
+
+/**
+ * Report which option a <select> ended up on. The option's visible text is
+ * what the replay picks it by, whitespace normalized the way WebdriverIO's
+ * selectByVisibleText compares it. A multiple-select is skipped: its change
+ * event only carries the final set, not which option was toggled.
+ * @param {HTMLSelectElement} select
+ */
+function reportSelectedOption(select) {
+    if (select.multiple) return;
+    const option = select.selectedOptions && select.selectedOptions[0];
+    if (!option) return;
+
+    reportEvent('/select-info', {
+        text: clipText(option.text.replace(/\s+/g, ' ').trim()),
+        id: select.id || null,
+        xpath: getXPath(select)
+    }, 'Option selected');
+}
+
+/**
+ * The element that owns the editing of a contenteditable region: typing lands
+ * in the host, but focus events can come from a descendant of it.
+ * @param {Element} element
+ * @returns {Element|null}
+ */
+function editingHost(element) {
+    if (!element || element.nodeType !== 1 || !element.isContentEditable) return null;
+    let host = element;
+    while (host.parentElement && host.parentElement.isContentEditable) host = host.parentElement;
+    return host;
+}
+
+/** Text of each editing host when focus arrived, to tell whether it changed by the time focus leaves. */
+const editableBaselines = new WeakMap();
+
+function handleEditableFocusIn(event) {
+    const host = editingHost(event.target);
+    if (host) editableBaselines.set(host, host.innerText);
+}
+
+/**
+ * A contenteditable region fires no `change` event, so what was typed into it
+ * is read when focus leaves, like a text field's commit - and replayed with
+ * the same step, since to the replay it is just a field to type into.
+ * @param {FocusEvent} event
+ */
+function handleEditableFocusOut(event) {
+    const host = editingHost(event.target);
+    if (!host || !editableBaselines.has(host)) return;
+
+    const before = editableBaselines.get(host);
+    editableBaselines.delete(host);
+    if (host.innerText === before) return;
+
+    flushPendingReports();
+    reportEvent('/input-info', {
+        text: clipText(host.innerText),
+        tagName: host.tagName.toLowerCase(),
+        id: host.id || null,
+        xpath: getXPath(host)
+    }, 'Rich text committed');
+}
+
+// --------------------------------------------------------------- drag and drop
+
+/** The element a drag started on, until it is dropped or cancelled. */
+let dragSource = null;
+
+function elementOf(node) {
+    if (!node) return null;
+    return node.nodeType === 1 ? node : node.parentElement || null;
+}
+
+function handleDragStart(event) {
+    dragSource = elementOf(event.target);
+}
+
+function handleDragEnd() {
+    dragSource = null;
+}
+
+/**
+ * Report an HTML5 drag-and-drop from one element of the page onto another.
+ * A drop with no drag started on this page (a file from the desktop) has no
+ * source to replay, so it is ignored. Drags driven by mouse events instead
+ * of the HTML5 API (many sortable-list libraries) fire none of these events
+ * and are not captured.
+ * @param {DragEvent} event
+ */
+function handleDrop(event) {
+    const source = dragSource;
+    const target = elementOf(event.target);
+    dragSource = null;
+    if (!source || !target || source === target) return;
+
+    const sourceXpath = getXPath(source);
+    const targetXpath = getXPath(target);
+    if (!sourceXpath || !targetXpath) return;
+
+    flushPendingReports();
+    reportEvent('/drag-info', { sourceXpath, targetXpath }, 'Dragged');
 }
 
 /**
@@ -362,6 +574,12 @@ function addEventListeners() {
     document.addEventListener('click', handleClick, true);  // Capture phase
     document.addEventListener('change', handleInputCommit, true);  // Fires once the field is committed, not per keystroke
     window.addEventListener('resize', handleResize);
+    document.addEventListener('scroll', handleScroll, true);
+    document.addEventListener('focusin', handleEditableFocusIn, true);
+    document.addEventListener('focusout', handleEditableFocusOut, true);
+    document.addEventListener('dragstart', handleDragStart, true);
+    document.addEventListener('dragend', handleDragEnd, true);
+    document.addEventListener('drop', handleDrop, true);
 }
 
 /**

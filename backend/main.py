@@ -109,12 +109,35 @@ def _as_str(value):
     return value[:MAX_FIELD_LENGTH] if isinstance(value, str) else None
 
 
+# Largest scroll offset accepted, in either direction (a right-to-left page
+# scrolls to negative x). Real pages are far smaller; the cap only keeps a
+# hostile value from reaching the replay step as an absurd number.
+MAX_SCROLL_OFFSET = 10_000_000
+
+
+def _as_offset(value):
+    """
+    Returns value as a whole number within +-MAX_SCROLL_OFFSET, or None - the
+    scroll counterpart of session_recorder.parse_viewport_dimension, except
+    that 0 is a valid position (the top of the page) and so is a negative one.
+    A JSON boolean, NaN, Infinity or anything that isn't a number is rejected.
+    """
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return parsed if abs(parsed) <= MAX_SCROLL_OFFSET else None
+
+
 def _publish_browser_event(event_type, data, skip_in_modes=()):
     """
     Publishes a content.js-reported event to the event bus, but only while a
-    session is recording - /tag-info, /input-info and /viewport-info all
-    share this, so the "is something recording, and did the event pass
-    validation" contract lives in one place instead of three copies.
+    session is recording - every capture route (/tag-info, /input-info,
+    /viewport-info, /select-info, /scroll-info, /drag-info) shares this, so
+    the "is something recording, and did the event pass validation" contract
+    lives in one place instead of a copy per route.
     @param event_type: one of event_model.ALLOWED_TYPES_BY_SOURCE["browser"]
     @param data: the event's payload
     @param skip_in_modes: capture modes in which this event is deliberately dropped
@@ -281,6 +304,68 @@ def viewport_info():
             return error
 
     return jsonify({"status": "Viewport information received"}), 200
+
+
+@app.route('/select-info', methods=['POST'])
+def select_info():
+    data, error = _json_object_or_400()
+    if error:
+        return error
+
+    text = _as_str(data.get('text'))
+    xpath = _as_str(data.get('xpath'))
+
+    # Both are needed to replay the choice; without them there is nothing to record.
+    if text is not None and xpath:
+        error = _publish_browser_event("select", {
+            "text": text,
+            "id": _as_str(data.get('id')),
+            "xpath": xpath})
+        if error:
+            return error
+
+    return jsonify({"status": "Select information received"}), 200
+
+
+@app.route('/scroll-info', methods=['POST'])
+def scroll_info():
+    data, error = _json_object_or_400()
+    if error:
+        return error
+
+    x = _as_offset(data.get('x'))
+    y = _as_offset(data.get('y'))
+    raw_xpath = data.get('xpath')
+    xpath = _as_str(raw_xpath)
+
+    # No xpath means the page itself scrolled. An xpath that is present but not
+    # a string is a malformed element scroll, which must not be recorded as a
+    # page scroll just because it failed to parse.
+    if x is not None and y is not None and (raw_xpath is None or xpath):
+        error = _publish_browser_event("scroll", {"x": x, "y": y, "xpath": xpath})
+        if error:
+            return error
+
+    return jsonify({"status": "Scroll information received"}), 200
+
+
+@app.route('/drag-info', methods=['POST'])
+def drag_info():
+    data, error = _json_object_or_400()
+    if error:
+        return error
+
+    source_xpath = _as_str(data.get('sourceXpath'))
+    target_xpath = _as_str(data.get('targetXpath'))
+
+    if source_xpath and target_xpath:
+        error = _publish_browser_event("drag", {
+            "source_xpath": source_xpath,
+            "target_xpath": target_xpath})
+        if error:
+            return error
+
+    return jsonify({"status": "Drag information received"}), 200
 
 
 if __name__ == '__main__':

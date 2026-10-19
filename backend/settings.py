@@ -4,9 +4,15 @@ import os
 # recordings wherever the backend happened to be launched from.
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 
-TEST_DIRECTORY = os.path.join(_BACKEND_DIR, "test_sessions")
-TRANSCRIPTION_DIR = os.path.join(_BACKEND_DIR, "transcriptions")
-EVENTS_DIRECTORY = os.path.join(_BACKEND_DIR, "events")
+# Where the three recording folders live: next to this file by default, or
+# under EYENAV_DATA_DIR when that is set. The test suite sets it to a
+# temporary directory (see tests/__init__.py), so running the tests can never
+# create, change or delete anything in the real recordings.
+_DATA_DIR = os.environ.get("EYENAV_DATA_DIR") or _BACKEND_DIR
+
+TEST_DIRECTORY = os.path.join(_DATA_DIR, "test_sessions")
+TRANSCRIPTION_DIR = os.path.join(_DATA_DIR, "transcriptions")
+EVENTS_DIRECTORY = os.path.join(_DATA_DIR, "events")
 
 
 def _make_private_directory(directory):

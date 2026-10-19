@@ -80,6 +80,32 @@ Given('I scroll until I can see the element with xpath {string}', async function
     return await element.scrollIntoView({ block: 'center', inline: 'center' });
 });
 
+Given('I select {string} in the dropdown with xpath {string}', async function (optionText, xpath) {
+    const element = await resolveXpathElement(this.driver, xpath);
+    await waitUntilReady(element);
+    // By visible text, as recorded: it reads the same in the .feature as on the
+    // page, and survives an option's value being renumbered.
+    return await element.selectByVisibleText(optionText);
+});
+
+Given('I scroll the page to {int},{int}', async function (x, y) {
+    return await this.driver.execute((left, top) => window.scrollTo(left, top), x, y);
+});
+
+Given('I scroll the element with xpath {string} to {int},{int}', async function (xpath, x, y) {
+    const element = await resolveXpathElement(this.driver, xpath);
+    await waitUntilReady(element);
+    return await this.driver.execute((el, left, top) => el.scrollTo(left, top), element, x, y);
+});
+
+Given('I drag the element with xpath {string} onto the element with xpath {string}', async function (sourceXpath, targetXpath) {
+    const source = await resolveXpathElement(this.driver, sourceXpath);
+    await waitUntilReady(source);
+    const target = await resolveXpathElement(this.driver, targetXpath);
+    await waitUntilReady(target);
+    return await source.dragAndDrop(target);
+});
+
 Given('I input {string}', async function (text) {
     return await this.driver.keys(text);
 });
@@ -103,12 +129,22 @@ Given('I set the viewport to {int}x{int}', async function (width, height) {
     return await this.driver.setWindowSize(width, height);
 });
 
+// A voice "scroll" is recorded as a direction only (pyautogui's 10 wheel clicks),
+// not a distance, so the replay scrolls a fixed, roughly equivalent amount.
+const VOICE_SCROLL_PIXELS = 400;
+
+async function scrollBy(driver, pixels) {
+    await driver.execute((distance) => window.scrollBy(0, distance), pixels);
+    // Lets a smooth scroll finish and anything it loads (lazy images, infinite lists) start.
+    return await driver.pause(500);
+}
+
 Given('I scroll down', async function () {
-    return await this.driver.pause(1000);
+    return await scrollBy(this.driver, VOICE_SCROLL_PIXELS);
 });
 
 Given('I scroll up', async function () {
-    return await this.driver.pause(1000);
+    return await scrollBy(this.driver, -VOICE_SCROLL_PIXELS);
 });
 
 Given('I go back', async function () {
