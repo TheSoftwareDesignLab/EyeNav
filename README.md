@@ -10,7 +10,7 @@ Supported on **macOS** and **Windows**.
 |---|---|---|
 | Python | **3.10** | `tobii-research 2.1.0` only ships wheels for 3.10 |
 | Google Chrome | 114+ | Side panel API |
-| Node.js | 18+ | Only for the extension unit tests and Kraken replay |
+| Node.js | 18+ | For the clean recording environment, the extension unit tests and Kraken replay |
 | Java JDK | 17 | Only for Kraken replay |
 | Tobii eye tracker | — | Optional: voice control and recording work without it |
 | Microphone | — | For voice commands |
@@ -87,6 +87,26 @@ Then open any web page, open EyeNav from its toolbar icon (popup or side panel),
 Recorded scenarios are written to `backend/test_sessions/` as `.feature` files.
 
 These recordings are gitignored and not backed up anywhere, so a deleted one is gone for good. Copy the ones you want to keep into `testing/features/` (`testing/copy.sh`). Set `EYENAV_DATA_DIR=<folder>` before starting the backend to keep `test_sessions/`, `events/` and `transcriptions/` somewhere else.
+
+### Recording in a clean environment
+
+A recording made in your everyday Chrome depends on that profile: signed-in accounts, cookies, history, cache and other extensions all change what the page shows. Kraken replays in an empty browser, so it gets a different page and the steps stop matching. For recordings that replay reliably, record in the clean environment instead: Playwright's bundled Chromium (the same build every time, pinned by `environment/package.json`), a brand-new empty profile with only EyeNav loaded, opened straight on the page the scenario starts from.
+
+Install it once, from `environment/` (downloads Playwright's Chromium to `~/Library/Caches/ms-playwright`, or `%USERPROFILE%\AppData\Local\ms-playwright` on Windows):
+
+```bash
+npm install
+```
+
+Then, with the backend running, from `environment/`:
+
+```bash
+npm run record -- https://example.com
+```
+
+Open EyeNav from the Extensions (puzzle piece) icon in that window, choose a mode and press **Play**; press **Stop** when done and close the window (or press Ctrl+C in the terminal). The profile is deleted when the window closes, so every recording starts from the same state. The command refuses to start if the backend is not running or a session is already recording.
+
+Window size, language and timezone are set in `environment/environment.json`.
 
 ### Voice commands and the browser
 
