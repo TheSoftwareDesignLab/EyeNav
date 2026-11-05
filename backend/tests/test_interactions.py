@@ -9,8 +9,13 @@ one Gherkin step, and is replayed by a matching step definition.
 import json
 import os
 import unittest
+from unittest.mock import patch
+import time
+import threading
 
+import event_bus
 import event_model
+import interaction_logger
 import feature_writer
 import session_manager
 from tests.test_recording_pipeline import RecordingTestCase, read
@@ -112,6 +117,30 @@ class InteractionRouteTests(RecordingTestCase):
             'And I scroll the element with xpath "//div[2]" to 0,40',
         ])
 
+    def test_typed_text_then_enter_is_recorded_in_that_order(self):
+        self.client.post("/input-info", json={"text": "hola", "xpath": '//input[@name="q"]'})
+        response = self.client.post("/key-info", json={"key": "Enter"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.recorded_steps(), [
+            'And I type "hola" into field with xpath "//input[@name=\\"q\\"]"',
+            "And I hit enter",
+        ])
+
+    def test_keys_other_than_enter_are_refused(self):
+        for body in ({"key": "a"}, {"key": ["Enter"]}, {}):
+            self.assertEqual(self.client.post("/key-info", json=body).status_code, 400, body)
+        self.assertEqual(self.recorded_steps(), [])
+
+    def test_the_browsers_back_and_forward_are_recorded(self):
+        for direction in ("back", "back", "forward"):
+            self.assertEqual(self.client.post("/history-info", json={"direction": direction}).status_code, 200)
+        self.assertEqual(self.recorded_steps(), ["And I go back", "And I go back", "And I go forward"])
+
+    def test_a_history_move_without_a_valid_direction_is_refused(self):
+        for body in ({"direction": "up"}, {"direction": ["back"]}, {}):
+            self.assertEqual(self.client.post("/history-info", json=body).status_code, 400, body)
+        self.assertEqual(self.recorded_steps(), [])
+
     def test_a_drag_is_recorded(self):
         self.client.post("/drag-info", json={"sourceXpath": "//li[1]", "targetXpath": "//li[2]"})
         self.assertEqual(self.recorded_steps(), [
@@ -185,3 +214,83 @@ class InteractionRouteTests(RecordingTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VoiceEchoTests(unittest.TestCase):
+    """In "all" mode a voice "enter"/"back"/"forward" presses the browser's key, which the page reports too."""
+
+    def event(self, source, event_type, seconds):
+        return event_model.Event(source=source, type=event_type, data={},
+                                 timestamp=f"2026-11-04T10:00:{seconds:02d}+00:00")
+
+    def test_the_pages_report_right_after_the_same_voice_command_is_skipped(self):
+        seen = {}
+        self.assertFalse(interaction_logger.is_voice_echo(self.event("voice", "back", 0), seen))
+        self.assertTrue(interaction_logger.is_voice_echo(self.event("browser", "back", 1), seen))
+
+    def test_a_later_or_different_browser_move_is_kept(self):
+        seen = {}
+        interaction_logger.is_voice_echo(self.event("voice", "back", 0), seen)
+        self.assertFalse(interaction_logger.is_voice_echo(self.event("browser", "forward", 1), seen))
+        self.assertFalse(interaction_logger.is_voice_echo(self.event("browser", "back", 10), seen))
+
+    def test_a_dictation_absorbs_one_report_of_its_text_whenever_it_comes(self):
+        seen = {}
+        interaction_logger.is_voice_echo(event_model.Event("voice", "input", {"text": "hola"}, "2026-11-04T10:00:00+00:00"), seen)
+        later = lambda text: event_model.Event("browser", "input", {"text": text}, "2026-11-04T10:05:00+00:00")
+        self.assertFalse(interaction_logger.is_voice_echo(later("adios"), seen))   # another text: typed by hand
+        self.assertTrue(interaction_logger.is_voice_echo(later("hola"), seen))     # the field left minutes later
+        self.assertFalse(interaction_logger.is_voice_echo(later("hola"), seen))    # only once
+
+    def test_browser_events_with_no_voice_command_are_kept(self):
+        for event_type in ("enter", "back", "click"):
+            self.assertFalse(interaction_logger.is_voice_echo(self.event("browser", event_type, 0), {}))
+
+
+class AllModeVoiceEchoTests(RecordingTestCase):
+    """
+    The whole path in "all" mode: voice_control publishes its command the way
+    it does, the page's own report of it arrives through its HTTP route, and
+    the .feature is read back.
+    """
+
+    def setUp(self):
+        super().setUp()
+        idle = {"start": lambda s: threading.Thread(target=lambda: None), "stop": lambda: None}
+        self.capturers = patch.dict(session_manager.CAPTURER_FACTORIES,
+                                    {"eye_tracking": lambda: idle, "voice_control": lambda: idle})
+        self.capturers.start()
+        session_manager.reset_capturer_cache()
+        self.session = session_manager.start_session("P", "http://x", "es", "all")
+
+    def tearDown(self):
+        super().tearDown()
+        self.capturers.stop()
+
+    def recorded_steps(self):
+        session_manager.stop_session()  # joins the logger, so every event is already written
+        return [line.strip() for line in read(self.session.test_file).splitlines() if line.strip().startswith("And")]
+
+    def test_saying_back_is_recorded_once(self):
+        event_bus.publish("voice", "back", {})                                   # "atrás": presses Cmd+[ ...
+        self.client.post("/history-info", json={"direction": "back"})            # ... which the page reports
+        self.assertEqual(self.recorded_steps(), ["And I go back"])
+
+    def test_dictating_then_saying_enter_is_recorded_once(self):
+        event_bus.publish("voice", "input", {"text": "hola"})                   # "escribir hola enviar": pastes ...
+        event_bus.publish("voice", "enter", {})                                  # ... and presses Enter
+        self.client.post("/input-info", json={"text": "hola", "xpath": '//input[@name="q"]'})   # the page: the field's text,
+        self.client.post("/key-info", json={"key": "Enter"})                     # then the key
+        self.assertEqual(self.recorded_steps(), ['And I input "hola"', "And I hit enter"])
+
+    def test_the_mouse_back_button_without_a_voice_command_is_recorded(self):
+        self.client.post("/history-info", json={"direction": "back"})
+        self.assertEqual(self.recorded_steps(), ["And I go back"])
+
+    def test_a_back_well_after_the_voice_command_is_a_second_one(self):
+        with patch.object(interaction_logger, "VOICE_ECHO_SECONDS", 0.2):
+            event_bus.publish("voice", "back", {})
+            time.sleep(0.5)
+            self.client.post("/history-info", json={"direction": "back"})
+            self.assertEqual(self.recorded_steps(), ["And I go back", "And I go back"])
+

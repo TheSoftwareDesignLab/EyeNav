@@ -1,10 +1,52 @@
 import json
 import logging
+from datetime import datetime
 
 import event_bus
 import feature_writer
 
 logger = logging.getLogger(__name__)
+
+# What a voice command does through the browser itself, which the page then
+# reports as its own: a dictation is pasted into the focused field, "enter"
+# presses Enter, "back"/"forward" press the browser's shortcut. In "all" mode
+# both arrive, and replaying both would type the text twice, press Enter
+# twice or go back two pages.
+VOICE_ECHO_TYPES = {"input", "enter", "back", "forward"}
+
+# Enter and the history shortcut act at once, so the page's report of them
+# follows within this many seconds. A dictated text is reported whenever the
+# field is left, which can be much later, so it is matched by its text instead.
+VOICE_ECHO_SECONDS = 3
+
+
+def is_voice_echo(event, last_voice_command):
+    """
+    Whether a browser event is the page's report of a voice command already
+    logged (see VOICE_ECHO_TYPES), and remembers each voice command. A
+    dictation absorbs one report of the same text, at any time; any other
+    command, the report that comes within VOICE_ECHO_SECONDS.
+    @param event: an event_model.Event
+    @param last_voice_command: this session's {type: [time, text, absorbed]}, updated here
+    @return: True if the event should not be logged
+    """
+    if event.type not in VOICE_ECHO_TYPES:
+        return False
+    when = datetime.fromisoformat(event.timestamp)
+    if event.source == "voice":
+        last_voice_command[event.type] = [when, event.data.get("text"), False]
+        return False
+
+    voice = last_voice_command.get(event.type)
+    if voice is None:
+        return False
+    voice_when, voice_text, absorbed = voice
+    if event.type == "input":
+        if absorbed or event.data.get("text") != voice_text:
+            return False
+        voice[2] = True
+        return True
+    return 0 <= (when - voice_when).total_seconds() <= VOICE_ECHO_SECONDS
 
 
 def log_step(session, event):
@@ -49,10 +91,15 @@ def main(session):
     until event_bus.stop() unblocks it so the thread can exit cleanly.
     @param session: the session_recorder.Session these events belong to
     """
+    last_voice_command = {}
     while True:
         event = event_bus.consume()
         if event_bus.is_stop_signal(event):
             break
+
+        if is_voice_echo(event, last_voice_command):
+            logger.info("Skipping %s/%s event: the page's echo of a voice command", event.source, event.type)
+            continue
 
         # Source and type only: the payload carries what the user typed or
         # dictated, which belongs in the session's own (owner-only) files,
