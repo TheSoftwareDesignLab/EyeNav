@@ -6,18 +6,18 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-    flush, plain, loadContentScript, loadBackground, loadStepsWithPage, makeDriver, names,
+    flush, plain, loadContentScript, loadBackground, loadStepsWithPage, makeDriver, names, registerFakeElement,
 } = require('./support');
 
 let uniqueId = 0;
 
-/** A minimal DOM element: enough for content.js's getXPath (which needs an id or a parent chain). */
+/** A minimal DOM element, findable by its id: enough for locator.js's getXPath (which needs an id or a parent chain). */
 function fakeElement(props = {}) {
-    return {
+    return registerFakeElement({
         nodeType: 1, tagName: 'DIV', id: '', className: '', parentNode: null, parentElement: null,
         isContentEditable: false, getAttribute: () => null,
         ...props,
-    };
+    });
 }
 
 /** Delivers `event` to one of content.js's handlers, by name. */
@@ -333,8 +333,97 @@ test('a pending scroll is reported before the drop that follows it', async () =>
 
 // ------------------------------------------------------------------- relay
 
-test('the relay passes the select, scroll and drag reports through', async () => {
-    for (const endpoint of ['/select-info', '/scroll-info', '/drag-info']) {
+// ------------------------------------------------------------------ Enter key
+
+function fakeField(props = {}) {
+    return fakeElement({ tagName: 'INPUT', id: `field-${++uniqueId}`, value: '', defaultValue: '', getAttribute: (name) => (name === 'type' ? 'search' : null), ...props });
+}
+
+test('Enter in a text field reports what was typed, then the key', async () => {
+    const page = loadContentScript();
+    const field = fakeField({ value: 'hola' });
+    fire(page, 'handleKeyDown', { key: 'Enter', target: field });
+    fire(page, 'handleInputCommit', { target: field });   // the change Enter also fires: same value, not again
+    await flush();
+
+    assert.deepEqual(page.endpoints(), ['/input-info', '/key-info']);
+    assert.equal(page.sent[0].data.text, 'hola');
+    assert.deepEqual(plain(page.sent[1].data), { key: 'Enter' });
+});
+
+test('Enter in a field whose text was already reported reports only the key', async () => {
+    const page = loadContentScript();
+    const field = fakeField({ value: 'hola' });
+    fire(page, 'handleInputCommit', { target: field });
+    fire(page, 'handleKeyDown', { key: 'Enter', target: field });
+    await flush();
+    assert.deepEqual(page.endpoints(), ['/input-info', '/key-info']);
+});
+
+test('other keys, Enter in a textarea, and Enter while composing text are not reported', async () => {
+    const page = loadContentScript();
+    fire(page, 'handleKeyDown', { key: 'a', target: fakeField({ value: 'a' }) });
+    fire(page, 'handleKeyDown', { key: 'Enter', target: fakeField({ tagName: 'TEXTAREA', value: 'line' }) });
+    fire(page, 'handleKeyDown', { key: 'Enter', isComposing: true, target: fakeField({ value: 'にほん' }) });
+    await flush();
+    assert.deepEqual(page.endpoints(), []);
+});
+
+// --------------------------------------------------------- browser Back/Forward
+
+test("the browser's Back and Forward are recorded from the browser, one step per page moved", async () => {
+    const background = loadBackground();
+    for (const url of ['/inicio', '/documento.pdf', '/eventos']) await background.navigate(url);
+    await background.navigate('/documento.pdf', { backForward: true });   // Back
+    await background.navigate('/eventos', { backForward: true });         // Forward
+    await background.navigate('/inicio', { backForward: true });          // two back, from the Back button's list
+    assert.deepEqual(background.historyReports(), ['back', 'forward', 'back', 'back']);
+});
+
+test("the page's own history.back(), reloads, links and frames are not recorded as Back or Forward", async () => {
+    const background = loadBackground();
+    for (const url of ['/inicio', '/eventos']) await background.navigate(url);
+    background.pageMoved();                                               // its "Volver" button: the click is the step
+    await background.navigate('/inicio', { backForward: true });
+    await background.navigate('/inicio', { reload: true });
+    await background.navigate('/anuncio', { frameId: 3 });
+    assert.deepEqual(background.historyReports(), []);
+
+    background.advance(5000);                                             // a later Back, by the user
+    await background.navigate('/eventos', { backForward: true });         // (Forward, in fact)
+    assert.deepEqual(background.historyReports(), ['forward']);
+});
+
+test('which way the tab went is still known after Chrome restarts the background worker', async () => {
+    const before = loadBackground();
+    for (const url of ['/inicio', '/documento.pdf']) await before.navigate(url);
+    const after = loadBackground({ storage: before.storage });
+    await after.navigate('/inicio', { backForward: true });
+    assert.deepEqual(after.historyReports(), ['back']);
+});
+
+test('history moves are only sent while a session is recording', async () => {
+    const background = loadBackground({ sessionActive: false });
+    for (const url of ['/inicio', '/documento.pdf']) await background.navigate(url);
+    await background.navigate('/inicio', { backForward: true });
+    assert.deepEqual(background.historyReports(), []);
+});
+
+test("the page tells the browser when it moved by itself, and commits the focused field before the browser's moves", async () => {
+    const page = loadContentScript();
+    page.window.navigation = { currentEntry: { index: 3 } };
+    fire(page, 'handleNavigate', { navigationType: 'traverse', userInitiated: false, destination: { index: 2 } });
+    page.document.activeElement = fakeField({ value: 'hola' });
+    fire(page, 'handleNavigate', { navigationType: 'traverse', userInitiated: true, destination: { index: 2 } });
+    fire(page, 'handleNavigate', { navigationType: 'push', userInitiated: true, destination: { index: 4 } });
+    await flush();
+
+    assert.deepEqual(plain(page.sent.map(message => message.type === 'EYENAV_REPORT' ? message.endpoint : message.type)),
+        ['EYENAV_PAGE_MOVED', '/input-info']);
+});
+
+test('the relay passes the select, scroll, drag, key and history reports through', async () => {
+    for (const endpoint of ['/select-info', '/scroll-info', '/drag-info', '/key-info', '/history-info']) {
         const background = loadBackground();
         const response = await background.report(endpoint);
         assert.equal(response.success, true, endpoint);
@@ -350,7 +439,7 @@ test('the select step waits for the dropdown, then picks the option by its visib
     await steps['I select {string} in the dropdown with xpath {string}'].call(
         { driver: makeDriver(log, { renderAfterCalls: 3 }) }, 'Colombia', '//*[@id="country"]');
 
-    assert.deepEqual(names(log), ['waitForExist', 'waitForDisplayed', 'selectByVisibleText']);
+    assert.deepEqual(names(log), ['waitForExist', 'waitUntil', 'selectByVisibleText']);
     assert.equal(log[2][1], 'Colombia');
 });
 
@@ -368,7 +457,7 @@ test('the element scroll step waits for the element, then scrolls that element',
     await steps['I scroll the element with xpath {string} to {int},{int}'].call(
         { driver: makeDriver(log, { renderAfterCalls: 2 }) }, '//*[@id="list"]', 0, 320);
 
-    assert.deepEqual(names(log), ['waitForExist', 'waitForDisplayed', 'execute', 'element.scrollTo']);
+    assert.deepEqual(names(log), ['waitForExist', 'waitUntil', 'execute', 'element.scrollTo']);
     assert.deepEqual(plain(log[3].slice(1)), [0, 320]);
 });
 
@@ -378,7 +467,7 @@ test('the drag step waits for both elements, then drags the first onto the secon
     await steps['I drag the element with xpath {string} onto the element with xpath {string}'].call(
         { driver: makeDriver(log) }, '//li[1]', '//li[2]');
 
-    assert.deepEqual(names(log), ['waitForExist', 'waitForDisplayed', 'waitForExist', 'waitForDisplayed', 'dragAndDrop']);
+    assert.deepEqual(names(log), ['waitForExist', 'waitUntil', 'waitForExist', 'waitUntil', 'dragAndDrop']);
 });
 
 test('the new element steps fail with a clear message when the element never appears', async () => {

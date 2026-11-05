@@ -5,7 +5,9 @@
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw6dozOCwuBlyOIbJFLDCBxpCX0oqWIfX0iodF8Iyr3ZM+K5cJ4KslhJpUU34J2HlmKtfZRSb0to9mAK2H0osjucfgu1FxfSfXCtFleIlxrjvwLu+tSCKkeLPMfnhGfv3ikM9ouNdMk/MXx7SP++qxnrKF18NKBXMGvwjy4nBCPpjs6RxkwkQeChxxDslwzsnhrcGWzOEdnIaq3DQkjLKDoX5IzoxTKDhrVvOi9Mx5u4tpJ1dpq9Aufxosy48shUr4PJOzO6X4sC6WIxlq/qSNCTgJqYDqgvOBEz4YrIO5IakgMvUG/v7Osh2+S+z3G8EorHfTDIIX8Q5v9xEMKhmYQIDAQAB",
   "permissions": [
     "tabs",
-    "sidePanel"
+    "sidePanel",
+    "webNavigation",
+    "storage"
   ],
   "host_permissions": [
     "http://localhost:5001/*"
@@ -23,7 +25,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["shared/config.js", "content.js"]
+      "js": ["shared/config.js", "locator.js", "content.js"]
     }
   ],
   "icons": {

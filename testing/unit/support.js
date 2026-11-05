@@ -39,6 +39,32 @@ function makeClock() {
     };
 }
 
+// locator.js only keeps a locator after checking, on the page, that it finds
+// exactly that element. These fake elements are in no page, so the two
+// lookups it checks with are reduced to finding a registered element by its
+// id, the way //*[@id="..."] and #id look it up. Which locator wins on a real
+// page is tested against a real browser in locator.test.js.
+const fakeElementsById = new Map();
+
+/** Makes a fake element findable by its id, as it would be on a page. */
+function registerFakeElement(element) {
+    if (element.id) fakeElementsById.set(element.id, element);
+    return element;
+}
+
+function registeredById(locator) {
+    const match = /^\/\/\*\[@id="([^"]*)"\]$/.exec(locator) || /^#([\w-]+)$/.exec(locator);
+    return (match && fakeElementsById.get(match[1])) || null;
+}
+
+const fakeDocumentLookups = {
+    evaluate(xpath) {
+        const element = registeredById(xpath);
+        return { snapshotLength: element ? 1 : 0, snapshotItem: () => element };
+    },
+    querySelector: registeredById,
+};
+
 function loadContentScript({ relayResponse = { success: true, ok: true, data: {} } } = {}) {
     const clock = makeClock();
     const sent = [];
@@ -47,14 +73,15 @@ function loadContentScript({ relayResponse = { success: true, ok: true, data: {}
 
     const sandbox = {
         window: { innerWidth: 1280, innerHeight: 720, devicePixelRatio: 1, scrollX: 0, scrollY: 0, addEventListener() {} },
-        document: { body: {}, querySelectorAll: () => [], addEventListener() {} },
+        document: { body: { nodeType: 1, tagName: 'BODY' }, querySelectorAll: () => [], addEventListener() {}, ...fakeDocumentLookups },
         Node: { ELEMENT_NODE: 1 },
+        XPathResult: { ORDERED_NODE_SNAPSHOT_TYPE: 7 },
         MutationObserver: class { observe() {} },
         chrome: {
             runtime: {
                 sendMessage(message, callback) {
                     sent.push(message);
-                    callback(relayResponse);
+                    if (callback) callback(relayResponse);
                 },
                 onMessage: { addListener(fn) { messageListener = fn; } },
             },
@@ -65,13 +92,14 @@ function loadContentScript({ relayResponse = { success: true, ok: true, data: {}
     };
     vm.createContext(sandbox);
     vm.runInContext(read('extension', 'shared', 'config.js'), sandbox);
+    vm.runInContext(read('extension', 'locator.js'), sandbox);
     vm.runInContext(read('extension', 'content.js'), sandbox);
 
     const call = (expression) => vm.runInContext(expression, sandbox);
-    sandbox.__element = {
+    sandbox.__element = registerFakeElement({
         nodeType: 1, tagName: 'BUTTON', id: 'go', className: '', textContent: ' Go ', parentNode: null,
         getAttribute: () => null,
-    };
+    });
     return {
         clock, sent, logs, sandbox, window: sandbox.window, document: sandbox.document, run: call,
         click: () => call('handleClick({ target: __element })'),
@@ -87,9 +115,15 @@ function loadContentScript({ relayResponse = { success: true, ok: true, data: {}
 
 // ---------------------------------------------------------------- background.js
 
-function loadBackground({ sessionActive = true } = {}) {
+/**
+ * background.js with fake Chrome APIs. `storage` stands for
+ * chrome.storage.session: pass the same one to a second loadBackground to
+ * play Chrome stopping and restarting the worker.
+ */
+function loadBackground({ sessionActive = true, storage = {} } = {}) {
     const requests = [];
     let messageListener = null;
+    const navigationListeners = [];
     let now = 0;
 
     const sandbox = {
@@ -97,9 +131,19 @@ function loadBackground({ sessionActive = true } = {}) {
         chrome: {
             sidePanel: { setPanelBehavior: () => Promise.resolve() },
             runtime: { onMessage: { addListener(fn) { messageListener = fn; } } },
+            webNavigation: Object.fromEntries(['onCommitted', 'onHistoryStateUpdated', 'onReferenceFragmentUpdated']
+                .map(name => [name, { addListener(fn) { navigationListeners.push(fn); } }])),
+            tabs: { onRemoved: { addListener() {} } },
+            storage: {
+                session: {
+                    get: async (key) => (key in storage ? { [key]: JSON.parse(storage[key]) } : {}),
+                    set: async (items) => { for (const [key, value] of Object.entries(items)) storage[key] = JSON.stringify(value); },
+                    remove: async (key) => { delete storage[key]; },
+                },
+            },
         },
         fetch(url, options = {}) {
-            requests.push({ url, method: options.method || 'GET' });
+            requests.push({ url, method: options.method || 'GET', body: options.body ? JSON.parse(options.body) : undefined });
             const body = url.endsWith('/status') ? { sessionActive } : { status: 'received' };
             return Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
         },
@@ -112,16 +156,29 @@ function loadBackground({ sessionActive = true } = {}) {
 
     return {
         requests,
+        storage,
         advance: (ms) => { now += ms; },
         report: (endpoint) => new Promise((resolve) => {
             messageListener({ type: 'EYENAV_REPORT', endpoint, data: {} }, {}, resolve);
         }),
+        /** The page in tab 1 saying it moved through its history by itself. */
+        pageMoved: () => messageListener({ type: 'EYENAV_PAGE_MOVED' }, { tab: { id: 1 } }, () => {}),
+        /** A top-frame navigation in tab 1, as chrome.webNavigation reports it. */
+        navigate: (url, { backForward = false, reload = false, frameId = 0 } = {}) => navigationListeners[0]({
+            tabId: 1, frameId, url,
+            transitionType: reload ? 'reload' : 'link',
+            transitionQualifiers: backForward ? ['forward_back'] : [],
+        }),
+        /** The history moves POSTed to the backend, in order. */
+        historyReports: () => requests.filter(r => r.url.endsWith('/history-info')).map(r => r.body.direction),
     };
 }
 
 // ---------------------------------------------------------------- step.js
 
-function loadStepsWithPage() {
+// globals: what the page's own window reports (innerWidth, devicePixelRatio, ...)
+// to functions the steps run in the page through driver.execute.
+function loadStepsWithPage(globals = {}) {
     const steps = {};
     const page = {
         calls: [],
@@ -136,6 +193,7 @@ function loadStepsWithPage() {
         window: page,
         console,
     };
+    Object.defineProperties(sandbox, Object.getOwnPropertyDescriptors(globals));
     vm.createContext(sandbox);
     vm.runInContext(read('testing', 'features', 'web', 'step_definitions', 'step.js'), sandbox);
     return { steps, page };
@@ -145,10 +203,20 @@ function loadSteps() {
     return loadStepsWithPage().steps;
 }
 
-function makeElement(log) {
+// size/visibility: what the page reports for it; { width: 0, height: 0 } is display: none.
+function makeElement(log, { size = { width: 40, height: 40 }, visibility = 'visible' } = {}) {
     return {
+        selector: '//fake',
         waitForExist: async (options) => { log.push(['waitForExist', options]); },
-        waitForDisplayed: async (options) => { log.push(['waitForDisplayed', options]); },
+        getSize: async () => size,
+        getCSSProperty: async (name) => ({ property: name, value: name === 'visibility' ? visibility : '' }),
+        waitUntil: async (condition, options) => {
+            log.push(['waitUntil', options]);
+            for (let attempt = 0; attempt < 50; attempt++) {
+                if (await condition()) return true;
+            }
+            throw new Error(options.timeoutMsg);
+        },
         click: async () => { log.push(['click']); },
         clearValue: async () => { log.push(['clearValue']); },
         scrollIntoView: async (options) => { log.push(['scrollIntoView', options]); },
@@ -161,9 +229,9 @@ function makeElement(log) {
 
 // $$ answers [] until `renderAfterCalls` lookups have happened, like WebdriverIO
 // does for an element a slow request has not rendered yet.
-function makeDriver(log, { renderAfterCalls = 0 } = {}) {
+function makeDriver(log, { renderAfterCalls = 0, size, visibility } = {}) {
     let lookups = 0;
-    const element = makeElement(log);
+    const element = makeElement(log, { size, visibility });
     return {
         $$: async () => (++lookups > renderAfterCalls ? [element] : []),
         $: async () => element,
@@ -183,6 +251,6 @@ function makeDriver(log, { renderAfterCalls = 0 } = {}) {
 const names = (log) => log.map(entry => entry[0]);
 
 module.exports = {
-    read, flush, plain, makeClock, loadContentScript, loadBackground,
+    read, flush, plain, makeClock, loadContentScript, loadBackground, registerFakeElement,
     loadSteps, loadStepsWithPage, makeElement, makeDriver, names,
 };

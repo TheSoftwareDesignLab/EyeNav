@@ -109,6 +109,13 @@ class FeatureWriterTests(unittest.TestCase):
         step = feature_writer.to_gherkin_step(click_event(href="http://x"))
         self.assertEqual(step, '\tAnd I click on tag with href "http://x"')
 
+    def test_click_inside_a_shadow_root_scrolls_and_clicks_by_its_shadow_selector(self):
+        step = feature_writer.to_gherkin_step(click_event(shadow_selector='button[data-testid="uc-accept-all-button"]'))
+        self.assertEqual(step.split("\n"), [
+            '\tAnd I scroll until I can see the element with shadow selector "button[data-testid=\\"uc-accept-all-button\\"]"',
+            '\tAnd I click on tag with shadow selector "button[data-testid=\\"uc-accept-all-button\\"]"',
+        ])
+
     def test_click_without_any_target_is_skipped(self):
         self.assertIsNone(feature_writer.to_gherkin_step(click_event()))
 
@@ -218,12 +225,22 @@ class RouteTests(RecordingTestCase):
         self.assertLess(scroll, click)
         self.assertLess(click, resize)
 
+    def test_a_click_inside_a_shadow_root_is_recorded_by_its_shadow_selector(self):
+        self.start()
+        session = session_manager._active_session
+        self.client.post("/tag-info", json={"tagName": "button", "shadowSelector": 'button[data-testid="ok"]',
+                                            "href": None, "id": None, "xpath": None})
+        self.client.post("/stop")
+        self.assertIn('And I click on tag with shadow selector "button[data-testid=\\"ok\\"]"', read(session.test_file))
+
     def test_input_is_dropped_in_eye_voice_mode_but_clicks_are_not(self):
-        # eye_voice dictation is already recorded as a voice event; the
-        # browser's own copy of the same text would duplicate it.
+        # eye_voice dictation, "enter", "back" and "forward" are already
+        # recorded as voice events; the browser's own copy would duplicate them.
         with patch.object(session_manager, "get_active_capture_mode", return_value="eye_voice"), \
                 patch.object(event_bus, "publish") as publish:
             self.client.post("/input-info", json={"text": "hi", "xpath": "//input"})
+            self.client.post("/key-info", json={"key": "Enter"})
+            self.client.post("/history-info", json={"direction": "back"})
             publish.assert_not_called()
             self.client.post("/tag-info", json={"id": "x", "xpath": "//a"})
             publish.assert_called_once()

@@ -6,8 +6,8 @@ def escape_gherkin_string(value):
     session's header - a second, slightly-different implementation there
     would be one more place for this kind of bug to creep back in.
     Without this, a literal double quote in captured text, an id, or an
-    xpath - content.js's getXPath() always produces id-based xpaths like
-    //*[@id="email"], which already contain quotes - breaks the quoting of
+    xpath - the xpaths extension/locator.js builds, like //*[@id="email"] or
+    //a[normalize-space()="Inicio"], already contain quotes - breaks the quoting of
     the generated line and the step fails to match anything at replay time.
 
     Backslashes are doubled first so a stray "\" right before the escaped
@@ -43,12 +43,23 @@ def to_gherkin_step(event):
     data = event.data
 
     if event.type == "click":
+        # A click inside a shadow root (a cookie banner, a web component) has
+        # no xpath - XPath can't reach into one - but a CSS selector the
+        # replay looks up through every open shadow root (getShadowSelector
+        # in extension/locator.js). It is used for both the scroll and the
+        # click, the same way an xpath is below.
+        shadow_selector = data.get("shadow_selector")
+        if shadow_selector:
+            selector = escape_gherkin_string(shadow_selector)
+            return (f'\tAnd I scroll until I can see the element with shadow selector "{selector}"\n'
+                    f'\tAnd I click on tag with shadow selector "{selector}"')
+
         xpath = data.get("xpath")
         # Scrolls the target into view and waits for it to render before the
         # click step below runs, regardless of which of the 3 forms that
-        # click step ends up taking - content.js always computes an xpath
-        # (getXPath() runs unconditionally in handleClick), even for an
-        # element that also has an href/id, so this doesn't depend on which
+        # click step ends up taking - describeClickTarget (extension/
+        # locator.js) always computes an xpath for an element of the page,
+        # even one that also has an href/id, so this doesn't depend on which
         # branch below is chosen. Skipped only when getXPath() itself
         # couldn't resolve one (returns null) - nothing to scroll to then.
         scroll_step = (

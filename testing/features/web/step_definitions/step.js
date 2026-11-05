@@ -16,7 +16,7 @@ function pickXpathElement(elements) {
 }
 
 /**
- * Resolves the element an xpath from content.js's getXPath() refers to,
+ * Resolves the element an xpath from getXPath() (extension/locator.js) refers to,
  * waiting for it to appear first. $$ never waits - on an element that has
  * not rendered yet it returns [] - so without this wait, an element filled
  * in asynchronously made every xpath-based step fail at once with an opaque
@@ -33,6 +33,23 @@ async function resolveXpathElement(driver, xpath) {
 }
 
 /**
+ * Whether an element is visible the way Playwright defines it: it takes up
+ * space on the page and isn't visibility: hidden (display: none leaves it no
+ * size). Unlike WebdriverIO's isDisplayed(), a transparent element
+ * (opacity: 0) counts, because it still takes clicks and the recorded click
+ * landed on it: a carousel's arrows before the mouse is over the carousel,
+ * an accordion's "+" once its item is open, the real input under a styled
+ * checkbox. Element commands, so WebdriverIO re-finds an element the page
+ * re-rendered in the meantime.
+ * @param {WebdriverIO.Element} element
+ */
+async function isRendered(element) {
+    const { width, height } = await element.getSize();
+    if (!(width > 0 && height > 0)) return false;
+    return (await element.getCSSProperty('visibility')).value === 'visible';
+}
+
+/**
  * Waits for an element to actually exist and be visible before a step acts
  * on it, instead of assuming it's already rendered the instant replay
  * reaches that step - a component that loads asynchronously (an XHR-backed
@@ -42,7 +59,25 @@ async function resolveXpathElement(driver, xpath) {
  */
 async function waitUntilReady(element) {
     await element.waitForExist({ timeout: ELEMENT_WAIT_TIMEOUT_MS });
-    return element.waitForDisplayed({ timeout: ELEMENT_WAIT_TIMEOUT_MS });
+    return element.waitUntil(() => isRendered(element), {
+        timeout: ELEMENT_WAIT_TIMEOUT_MS,
+        timeoutMsg: `element (${element.selector}) still not visible after ${ELEMENT_WAIT_TIMEOUT_MS}ms`,
+    });
+}
+
+/**
+ * Resolves a selector for an element inside a shadow root (a cookie banner,
+ * a web component), recorded by getShadowSelector in extension/locator.js.
+ * WebdriverIO's ">>>" prefix looks it up through every open shadow root,
+ * which neither XPath nor a plain CSS selector can reach into. Waits for it
+ * like every other step does.
+ * @param {WebdriverIO.Browser} driver
+ * @param {string} selector
+ */
+async function resolveShadowElement(driver, selector) {
+    const element = await driver.$(`>>>${selector}`);
+    await waitUntilReady(element);
+    return element;
 }
 
 Given('I click on tag with href {string}', async function (href) {
@@ -78,6 +113,16 @@ Given('I scroll until I can see the element with xpath {string}', async function
     // fixed header would sit on top of a target scrolled to the top, and the
     // click that follows would be intercepted by it.
     return await element.scrollIntoView({ block: 'center', inline: 'center' });
+});
+
+Given('I scroll until I can see the element with shadow selector {string}', async function (selector) {
+    const element = await resolveShadowElement(this.driver, selector);
+    return await element.scrollIntoView({ block: 'center', inline: 'center' });
+});
+
+Given('I click on tag with shadow selector {string}', async function (selector) {
+    const element = await resolveShadowElement(this.driver, selector);
+    return await element.click();
 });
 
 Given('I select {string} in the dropdown with xpath {string}', async function (optionText, xpath) {
@@ -121,12 +166,40 @@ Given('I type {string} into field with xpath {string}', async function (text, xp
     return await this.driver.keys(text);
 });
 
+/**
+ * Makes the page exactly width x height (content.js records innerWidth x
+ * innerHeight) by resizing the browser window around it, as the recording
+ * browser's window holds its page. WebdriverIO's setWindowSize, over the
+ * DevTools protocol Kraken uses, emulates a page of that size inside an
+ * unchanged window instead: the page sits in a corner of a bigger window
+ * (or is cut off by a smaller one) and renders at a pixel density of 1, not
+ * the screen's - not what the recording saw. Only if the screen can't fit
+ * the window is the size emulated, at the screen's own density.
+ * @param {WebdriverIO.Browser} driver
+ * @param {number} width
+ * @param {number} height
+ */
+async function setPageSize(driver, width, height) {
+    const [page] = await (await driver.getPuppeteer()).pages();
+    const session = await page.target().createCDPSession();
+    await session.send('Emulation.clearDeviceMetricsOverride');
+    const { windowId } = await session.send('Browser.getWindowForTarget');
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const size = await driver.execute(() => ({ innerWidth, innerHeight, outerWidth, outerHeight }));
+        if (size.innerWidth === width && size.innerHeight === height) return;
+        // The window is the page plus the browser's own bars, which the difference measures.
+        await session.send('Browser.setWindowBounds', {
+            windowId,
+            bounds: { width: width + size.outerWidth - size.innerWidth, height: height + size.outerHeight - size.innerHeight },
+        });
+        await driver.pause(200);
+    }
+    const deviceScaleFactor = await driver.execute(() => devicePixelRatio);
+    await session.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile: false });
+}
+
 Given('I set the viewport to {int}x{int}', async function (width, height) {
-    // Resizes the OUTER browser window, not the exact content viewport, so
-    // the page's actual viewport ends up slightly smaller than width x
-    // height (browser chrome takes some of it) - close enough to reproduce
-    // the recorded layout, not pixel-perfect.
-    return await this.driver.setWindowSize(width, height);
+    return await setPageSize(this.driver, width, height);
 });
 
 // A voice "scroll" is recorded as a direction only (pyautogui's 10 wheel clicks),
@@ -148,17 +221,17 @@ Given('I scroll up', async function () {
 });
 
 Given('I go back', async function () {
-    this.driver.back();
+    await this.driver.back();
     return await this.driver.pause(1000);
 });
 
 Given('I go forward', async function () {
-    this.driver.forward();
+    await this.driver.forward();
     return await this.driver.pause(1000);
 });
 
 Given('I hit enter', async function () {
-    this.driver.keys('Enter');
-    return await this.driver.pause(1000)
+    await this.driver.keys('Enter');
+    return await this.driver.pause(1000);
 });
 

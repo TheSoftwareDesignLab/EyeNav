@@ -244,12 +244,14 @@ def tag_info():
     href = _as_str(data.get('href'))
     element_id = _as_str(data.get('id'))
     xpath = _as_str(data.get('xpath'))
+    shadow_selector = _as_str(data.get('shadowSelector'))
 
     error = _publish_browser_event("click", {
         "selector": tag_name,
         "href": href,
         "id": element_id,
-        "xpath": xpath})
+        "xpath": xpath,
+        "shadow_selector": shadow_selector})
     if error:
         return error
 
@@ -271,9 +273,9 @@ def input_info():
     # voice_control's own OS-level paste (a real keystroke the page sees
     # natively) - which voice_control already logs as its own "voice"/"input"
     # event. Publishing this one too would record - and later replay - the
-    # same typed text twice. "all" mode is left alone: it means both
-    # modalities are meant to work at once, and there's no way to tell here
-    # whether a given change came from real typing or from voice.
+    # same typed text twice. In "all" mode both modalities work at once, so
+    # it is published, and interaction_logger drops it if it is the text the
+    # last dictation pasted (is_voice_echo).
     error = _publish_browser_event("input", {
         "text": text,
         "id": element_id,
@@ -282,6 +284,46 @@ def input_info():
         return error
 
     return jsonify({"status": "Input information received"}), 200
+
+
+@app.route('/key-info', methods=['POST'])
+def key_info():
+    data, error = _json_object_or_400()
+    if error:
+        return error
+
+    # Only Enter is recorded (it submits a field's form); what was typed is
+    # reported by /input-info. Skipped in eye_voice mode for the same reason
+    # as /input-info: there the key comes from voice_control's own "enter",
+    # which it already logs.
+    if _as_str(data.get('key')) != 'Enter':
+        return jsonify({"status": "Only the Enter key is recorded"}), 400
+
+    error = _publish_browser_event("enter", {}, skip_in_modes=("eye_voice",))
+    if error:
+        return error
+
+    return jsonify({"status": "Key information received"}), 200
+
+
+@app.route('/history-info', methods=['POST'])
+def history_info():
+    data, error = _json_object_or_400()
+    if error:
+        return error
+
+    # The browser's own Back/Forward, one request per history entry moved.
+    # Skipped in eye_voice mode for the same reason as /key-info: there the
+    # move comes from voice_control's "back"/"forward", which it already logs.
+    direction = _as_str(data.get('direction'))
+    if direction not in ("back", "forward"):
+        return jsonify({"status": "direction must be back or forward"}), 400
+
+    error = _publish_browser_event(direction, {}, skip_in_modes=("eye_voice",))
+    if error:
+        return error
+
+    return jsonify({"status": "History information received"}), 200
 
 
 @app.route('/viewport-info', methods=['POST'])

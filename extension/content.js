@@ -8,54 +8,6 @@ const INTERACTIVE_TAGS = ['a', 'button', 'input', 'select', 'textarea'];
 const INTERACTIVE_TAGS_SELECTOR = INTERACTIVE_TAGS.join(', ');
 
 /**
- * Builds an XPath 1.0 string literal for a value that may itself contain
- * quote characters. XPath string literals have no escape mechanism for
- * their own delimiter, so a value with only one quote type is wrapped in
- * the other, and a value with both is built via concat() instead - without
- * this, an id containing a literal `"` (valid in HTML) would produce an
- * unparsable xpath like //*[@id="he"llo"] that fails or matches the wrong
- * element at replay time no matter how the surrounding Gherkin line escapes it.
- * @param {string} value
- * @returns {string}
- */
-function xpathLiteral(value) {
-    if (!value.includes('"')) return `"${value}"`;
-    if (!value.includes("'")) return `'${value}'`;
-    const pieces = [];
-    value.split('"').forEach((part, index, parts) => {
-        pieces.push(`"${part}"`);
-        if (index < parts.length - 1) pieces.push(`'"'`);
-    });
-    return `concat(${pieces.join(', ')})`;
-}
-
-/**
- * Get the full XPath of an element
- * @param {HTMLElement} element
- * @returns {string}
- */
-function getXPath(element) {
-    if (element.id) return `//*[@id=${xpathLiteral(element.id)}]`;
-    if (element === document.body) return '/html/body';
-
-    let parts = [];
-    while (element && element.nodeType === Node.ELEMENT_NODE) {
-        let ix = 0;
-        let siblings = element.parentNode ? Array.from(element.parentNode.childNodes) : [];
-        for (let i = 0; i < siblings.length; i++) {
-            const sibling = siblings[i];
-            if (sibling === element) {
-                parts.unshift(`${element.tagName.toLowerCase()}[${ix + 1}]`);
-                break;
-            }
-            if (sibling.nodeType === 1 && sibling.tagName === element.tagName) ix++;
-        }
-        element = element.parentNode;
-    }
-    return parts.length ? '/' + parts.join('/') : null;
-}
-
-/**
  * Check if an element is relevant
  * @param {HTMLElement} element
  * @returns {boolean}
@@ -151,6 +103,45 @@ function reportEvent(endpoint, data, label) {
 }
 
 /**
+ * The control a just-clicked <label> belongs to, until that click's task ends.
+ * Clicking a label makes the browser click its control too (the checkbox,
+ * radio or field it labels), as a second click event within the same task.
+ * Recording both would replay as two clicks - a checkbox ticked and then
+ * unticked - so that second click is not reported.
+ * @type {HTMLElement|null}
+ */
+let labelledControl = null;
+
+/**
+ * Whether a click on `element` is the browser's own click on the control of
+ * the label clicked just before, and remembers the control when `element` is
+ * a label.
+ * @param {Element} element
+ * @returns {boolean}
+ */
+function isLabelEcho(element) {
+    if (labelledControl && element === labelledControl) {
+        labelledControl = null;
+        return true;
+    }
+    labelledControl = element.tagName.toLowerCase() === 'label' && element.control ? element.control : null;
+    if (labelledControl) setTimeout(() => { labelledControl = null; }, 0);
+    return false;
+}
+
+/**
+ * Whether the click landed on the bare page - <body> or <html> itself, on
+ * no element of it. There is nothing there to point the replay at: a step
+ * that clicks the body clicks the middle of the whole page, which scrolls it
+ * and can land on whatever link happens to be there.
+ * @param {Element} element
+ * @returns {boolean}
+ */
+function isPageBackground(element) {
+    return element === document.body || element === document.documentElement;
+}
+
+/**
  * Handle the click event
  * @param {MouseEvent} event
  */
@@ -158,21 +149,16 @@ function handleClick(event) {
     if (event.isEyeNavHandled) return;  // Prevent duplicate execution
     event.isEyeNavHandled = true;  // Mark event as handled by EyeNav
 
+    const element = clickedElement(event);
+    if (isLabelEcho(element) || isPageBackground(element)) return;
+
     flushPendingReports();
+    commitFocusedField(element);
 
-    const element = event.target;
-
-    // Only what the backend turns into a step. textContent used to be sent
-    // too (and ignored there): a click on <body> or a large container posted
-    // the whole page's text, whatever it contained.
-    const tagData = {
-        tagName: element.tagName.toLowerCase(),
-        href: element.getAttribute('href') || null,
-        id: element.id || null,
-        xpath: getXPath(element)
-    };
-
-    reportEvent('/tag-info', tagData, 'Clicked');
+    // Only what the backend turns into a step (see locator.js). textContent
+    // used to be sent too (and ignored there): a click on <body> or a large
+    // container posted the whole page's text, whatever it contained.
+    reportEvent('/tag-info', describeClickTarget(element), 'Clicked');
 }
 
 /**
@@ -236,15 +222,85 @@ function handleInputCommit(event) {
 
     // `change` only fires when the value actually changed, so this also
     // correctly captures the user clearing a field back to empty - an
-    // earlier `if (!value) return` here silently dropped that case.
-    const inputData = {
+    // earlier `if (!value) return` here silently dropped that case. A value
+    // commitFocusedField already reported is not reported again.
+    if (reportedValues.get(element) === element.value) return;
+    reportFieldValue(element);
+}
+
+/**
+ * The value each text field last reported, so a value is recorded once even
+ * when both handleInputCommit and commitFocusedField see it.
+ * @type {WeakMap<HTMLElement, string>}
+ */
+const reportedValues = new WeakMap();
+
+function reportFieldValue(element) {
+    reportedValues.set(element, element.value);
+    reportEvent('/input-info', {
         text: clipText(element.value),
         tagName: element.tagName.toLowerCase(),
         id: element.id || null,
         xpath: getXPath(element)
-    };
+    }, 'Input committed');
+}
 
-    reportEvent('/input-info', inputData, 'Input committed');
+/** Reports the field's value unless it is the one it already reported, or has had since the page loaded. */
+function reportFieldIfChanged(field) {
+    const committed = reportedValues.has(field) ? reportedValues.get(field) : field.defaultValue;
+    if (field.value !== committed) reportFieldValue(field);
+}
+
+/**
+ * Reports what was typed into the focused text field before a click on
+ * something else, if the field hasn't reported it yet. A field reports its
+ * value on `change`, when focus leaves it - but a list of suggestions keeps
+ * the focus in the field while one of them is clicked, and that click
+ * usually loads another page: `change` never fires, and the typed text was
+ * lost, leaving a replay that clicks a suggestion that never appears.
+ * @param {Element} clicked - the element the click is on
+ */
+function commitFocusedField(clicked) {
+    const field = document.activeElement;
+    if (!field || field === clicked || !isTextInput(field)) return;
+    reportFieldIfChanged(field);
+}
+
+/**
+ * A move through the tab's history. The browser's own Back and Forward
+ * (toolbar buttons, a trackpad swipe, a mouse's side buttons, shortcuts) are
+ * recorded by background.js, which sees every one of them, whatever page is
+ * being left. From here it only needs to know when the page made the move
+ * itself (userInitiated is false: history.back() from the page's own "Back"
+ * button), because the click that ran it is already recorded. Before the
+ * browser moves, whatever was typed into the focused field is reported.
+ * @param {NavigateEvent} event
+ */
+function handleNavigate(event) {
+    if (event.navigationType !== 'traverse') return;
+    if (!event.userInitiated) {
+        chrome.runtime.sendMessage({ type: EYENAV_MESSAGE_TYPES.PAGE_MOVED });
+        return;
+    }
+    flushPendingReports();
+    commitFocusedField(null);
+}
+
+/**
+ * Enter in a single-line text field submits its form (a search box, a login
+ * form). The field's value is reported first, then the key, so the replay
+ * types the text and then presses Enter. No other key is recorded: what was
+ * typed is read from the field itself.
+ * @param {KeyboardEvent} event
+ */
+function handleKeyDown(event) {
+    if (event.key !== 'Enter' || event.isComposing) return;
+    const field = event.target;
+    if (!isTextInput(field) || field.tagName.toLowerCase() === 'textarea') return;
+
+    flushPendingReports();
+    reportFieldIfChanged(field);
+    reportEvent('/key-info', { key: 'Enter' }, 'Key pressed');
 }
 
 // Same limit the backend applies to any single captured field (MAX_FIELD_LENGTH
@@ -573,6 +629,7 @@ function mutationCallback(mutations) {
 function addEventListeners() {
     document.addEventListener('click', handleClick, true);  // Capture phase
     document.addEventListener('change', handleInputCommit, true);  // Fires once the field is committed, not per keystroke
+    document.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('resize', handleResize);
     document.addEventListener('scroll', handleScroll, true);
     document.addEventListener('focusin', handleEditableFocusIn, true);
@@ -580,6 +637,7 @@ function addEventListeners() {
     document.addEventListener('dragstart', handleDragStart, true);
     document.addEventListener('dragend', handleDragEnd, true);
     document.addEventListener('drop', handleDrop, true);
+    if (window.navigation) window.navigation.addEventListener('navigate', handleNavigate);
 }
 
 /**
