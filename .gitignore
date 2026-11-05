@@ -5,16 +5,14 @@ backend/transcriptions/
 backend/events/
 node_modules/
 backend/rosetta-env/
-backend/venv/
+venv/
 experiments/
 
-backend/__pycache__/
+__pycache__/
 
 testing/reports/
 
 TODO.md
-
-.DS_Store
 
 
 ## Core latex/pdflatex auxiliary files:
