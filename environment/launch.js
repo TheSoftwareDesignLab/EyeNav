@@ -67,8 +67,8 @@ function loadEnvironmentConfig(file = CONFIG_PATH) {
     if (!size || !isPositiveInteger(size.width) || !isPositiveInteger(size.height)) {
         throw new Error(`${file}: "window" needs a positive integer "width" and "height"`);
     }
-    if (typeof locale !== 'string' || !locale) throw new Error(`${file}: "locale" must be a language tag such as "es-CO"`);
-    if (typeof timezone !== 'string' || !timezone) throw new Error(`${file}: "timezone" must be an IANA name such as "America/Bogota"`);
+    if (typeof locale !== 'string' || !locale) throw new Error(`${file}: "locale" must be a language tag such as "en-US" or "es-CO"`);
+    if (typeof timezone !== 'string' || !timezone) throw new Error(`${file}: "timezone" must be an IANA name such as "UTC" or "America/Bogota"`);
     return { window: { width: size.width, height: size.height }, locale, timezone };
 }
 
@@ -101,6 +101,66 @@ function buildLaunchOptions(config, extensionDir = EXTENSION_DIR) {
             `--lang=${config.locale}`,
         ],
     };
+}
+
+/**
+ * Where the pinned Chromium is installed. Kraken replays in it too
+ * (testing/features/web/support/hooks.js), so a recording and its replay
+ * run in the same browser build. Required lazily: the rest of this file is
+ * used by unit tests that must not need the browser.
+ * @returns {string}
+ */
+function chromiumExecutablePath() {
+    let executablePath;
+    try {
+        executablePath = require('playwright').chromium.executablePath();
+    } catch {
+        executablePath = null;
+    }
+    if (!executablePath || !fs.existsSync(executablePath)) {
+        throw new Error('The clean environment\'s Chromium is not installed. Run npm install in environment/ first.');
+    }
+    return executablePath;
+}
+
+/**
+ * WebdriverIO capabilities for Kraken's replay: this same Chromium, opened
+ * the way Playwright opens it to record - without --enable-automation, which
+ * Kraken's launcher adds by default, and with --disable-infobars. Otherwise
+ * the replay window has two bars the recording window doesn't ("controlled
+ * by automated test software", "Chrome for Testing"), over 100 px taller,
+ * and on a small screen the window can't fit the recorded page size.
+ * AutomationControlled keeps navigator.webdriver true without that bar, as
+ * the recording browser reports it, and the back/forward cache is off in
+ * both, so going back reloads the page instead of restoring it in whatever
+ * state it was left. Kraken still starts the browser with a new, empty
+ * profile and no extensions.
+ */
+function replayCapabilities() {
+    return {
+        'goog:chromeOptions': {
+            binary: chromiumExecutablePath(),
+            args: ['--disable-infobars', '--enable-blink-features=AutomationControlled', '--disable-back-forward-cache'],
+        },
+        'wdio:devtoolsOptions': { ignoreDefaultArgs: ['--enable-automation'] },
+    };
+}
+
+/**
+ * The language and timezone settings Playwright gives the recording browser
+ * through buildLaunchOptions' locale and timezoneId, as the same DevTools
+ * protocol commands Playwright sends - for the replay, which opens its
+ * browser through WebdriverIO instead. An empty userAgent keeps the
+ * browser's own, and its client hints with it.
+ * @param {ReturnType<typeof loadEnvironmentConfig>} config
+ * @returns {Array<[string, Object]>} [method, params] pairs
+ */
+function pageSettingsCommands(config) {
+    return [
+        ['Emulation.setLocaleOverride', { locale: config.locale }],
+        ['Emulation.setTimezoneOverride', { timezoneId: config.timezone }],
+        ['Emulation.setUserAgentOverride', { userAgent: '', acceptLanguage: config.locale }],
+    ];
 }
 
 /**
@@ -140,4 +200,7 @@ module.exports = {
     buildLaunchOptions,
     checkBackend,
     isEyeNavWorker,
+    chromiumExecutablePath,
+    replayCapabilities,
+    pageSettingsCommands,
 };

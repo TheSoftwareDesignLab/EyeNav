@@ -96,11 +96,7 @@ async function main() {
     console.log('Browser closed and its profile deleted.');
 }
 
-if (require.main === module) {
-    main().catch((error) => {
-        console.error(error.message);
-        process.exitCode = 1;
-    });
-}
-
-module.exports = { untilClosed };
+main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+});

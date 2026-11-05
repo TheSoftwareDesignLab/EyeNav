@@ -11,6 +11,7 @@ const path = require('node:path');
 const {
     EXTENSION_DIR, EXTENSION_ID, CONFIG_PATH,
     parseTargetUrl, loadEnvironmentConfig, buildLaunchOptions, checkBackend, isEyeNavWorker,
+    replayCapabilities, pageSettingsCommands,
 } = require('../../environment/launch');
 
 const repo = path.join(__dirname, '..', '..');
@@ -79,3 +80,27 @@ test('no clean browser opens while the backend is down or already recording', as
     await assert.rejects(checkBackend(fakeFetch({ sessionActive: true, captureMode: 'mouse_keyboard' })), /mouse_keyboard session is already recording/);
     assert.deepEqual(await checkBackend(fakeFetch({ sessionActive: false, captureMode: null })), { sessionActive: false, captureMode: null });
 });
+
+test('the replay gets the same language and timezone, as the commands Playwright sends', () => {
+    const commands = pageSettingsCommands({ window: { width: 1280, height: 800 }, locale: 'en-US', timezone: 'UTC' });
+    assert.deepEqual(commands, [
+        ['Emulation.setLocaleOverride', { locale: 'en-US' }],
+        ['Emulation.setTimezoneOverride', { timezoneId: 'UTC' }],
+        // An empty user agent keeps the browser's own, client hints included.
+        ['Emulation.setUserAgentOverride', { userAgent: '', acceptLanguage: 'en-US' }],
+    ]);
+});
+
+test('the replay browser is the installed Chromium, opened without the bars the recording browser lacks', () => {
+    let capabilities;
+    try {
+        capabilities = replayCapabilities();
+    } catch (error) {
+        assert.match(error.message, /npm install in environment\//);
+        return;
+    }
+    assert.ok(fs.existsSync(capabilities['goog:chromeOptions'].binary), capabilities['goog:chromeOptions'].binary);
+    assert.deepEqual(capabilities['goog:chromeOptions'].args, ['--disable-infobars', '--enable-blink-features=AutomationControlled', '--disable-back-forward-cache']);
+    assert.deepEqual(capabilities['wdio:devtoolsOptions'].ignoreDefaultArgs, ['--enable-automation']);
+});
+

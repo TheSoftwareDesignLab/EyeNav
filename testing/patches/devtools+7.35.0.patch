@@ -1,0 +1,18 @@
+diff --git a/node_modules/devtools/build/devtoolsdriver.js b/node_modules/devtools/build/devtoolsdriver.js
+index beb6cc1..086c8d5 100644
+--- a/node_modules/devtools/build/devtoolsdriver.js
++++ b/node_modules/devtools/build/devtoolsdriver.js
+@@ -232,7 +232,12 @@ class DevToolsDriver {
+              * if we have an execution context, also check for the ready state
+              */
+             const readyState = await executionContext.evaluate('document.readyState');
+-            if (readyState === 'complete' || pageloadTimeoutReached) {
++            // EyeNav patch: go on once the document is ready ("interactive"),
++            // not only once every resource has loaded ("complete"). One stuck
++            // ad or analytics request kept every command after a navigation -
++            // even the screenshot after a click, and closing the browser -
++            // waiting for the page-load timeout, far past a step's 30 s.
++            if (readyState !== 'loading' || pageloadTimeoutReached) {
+                 return;
+             }
+         }
